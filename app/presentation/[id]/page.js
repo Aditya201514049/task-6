@@ -3,268 +3,525 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import TextBlock from '../../components/TextBlock'
+import SlidePanel from '../../components/SlidePanel'
+import useSocket from '../../hooks/useSocket'
 
 export default function PresentationEditor() {
   const params = useParams()
   const presentationId = params.id
+
   const [presentation, setPresentation] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [currentSlideIndex, setCurrentSlideIndex] = useState(0)
-  const [selectedTextBlockId, setSelectedTextBlockId] = useState(null)
+  const [error, setError] = useState(null)
+  const [selectedSlideId, setSelectedSlideId] = useState(null)
   const [nickname, setNickname] = useState('')
+
+  // Initialize WebSocket connection
+  const {
+    isConnected,
+    connectedUsers: socketConnectedUsers,
+    emitTextBlockUpdate,
+    emitTextBlockAdd,
+    emitTextBlockDelete,
+    emitSlideAdd,
+    onTextBlockUpdate,
+    onTextBlockAdd,
+    onTextBlockDelete,
+    onSlideAdd,
+    onPresentationUpdate
+  } = useSocket(presentationId, nickname)
+
+  // Get current user info
+  const isCreator = presentation?.createdBy === nickname
+  const currentUser = presentation?.connectedUsers?.find(user => user.nickname === nickname)
+  const userRole = currentUser?.role || 'Viewer'
 
   useEffect(() => {
     // Get nickname from localStorage
-    const storedNickname = localStorage.getItem('userNickname')
+    const storedNickname = localStorage.getItem('nickname')
     if (storedNickname) {
       setNickname(storedNickname)
     }
-    
-    fetchPresentation()
+  }, [])
+
+  useEffect(() => {
+    if (presentationId) {
+      fetchPresentation()
+    }
   }, [presentationId])
+
+  // Set up real-time event listeners
+  useEffect(() => {
+    if (!nickname || !presentationId) return
+
+    const unsubscribeTextBlockUpdate = onTextBlockUpdate?.((data) => {
+      if (data.updatedBy !== nickname) {
+        setPresentation(prev => {
+          if (!prev) return prev
+          const updatedSlides = prev.slides.map(slide => {
+            if (slide.id === data.slideId) {
+              const updatedTextBlocks = slide.textBlocks.map(block =>
+                block.id === data.blockId ? { ...block, ...data.updates } : block
+              )
+              return { ...slide, textBlocks: updatedTextBlocks }
+            }
+            return slide
+          })
+          return { ...prev, slides: updatedSlides }
+        })
+      }
+    })
+
+    const unsubscribeTextBlockAdd = onTextBlockAdd?.((data) => {
+      if (data.addedBy !== nickname) {
+        setPresentation(prev => {
+          if (!prev) return prev
+          const updatedSlides = prev.slides.map(slide => {
+            if (slide.id === data.slideId) {
+              return {
+                ...slide,
+                textBlocks: [...(slide.textBlocks || []), data.textBlock]
+              }
+            }
+            return slide
+          })
+          return { ...prev, slides: updatedSlides }
+        })
+      }
+    })
+
+    const unsubscribeTextBlockDelete = onTextBlockDelete?.((data) => {
+      if (data.deletedBy !== nickname) {
+        setPresentation(prev => {
+          if (!prev) return prev
+          const updatedSlides = prev.slides.map(slide => {
+            if (slide.id === data.slideId) {
+              return {
+                ...slide,
+                textBlocks: slide.textBlocks.filter(block => block.id !== data.blockId)
+              }
+            }
+            return slide
+          })
+          return { ...prev, slides: updatedSlides }
+        })
+      }
+    })
+
+    const unsubscribeSlideAdd = onSlideAdd?.((data) => {
+      if (data.addedBy !== nickname) {
+        setPresentation(prev => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            slides: [...prev.slides, data.slide]
+          }
+        })
+      }
+    })
+
+    const unsubscribePresentationUpdate = onPresentationUpdate?.((data) => {
+      // Refresh presentation data when major updates occur
+      fetchPresentation()
+    })
+
+    return () => {
+      unsubscribeTextBlockUpdate?.()
+      unsubscribeTextBlockAdd?.()
+      unsubscribeTextBlockDelete?.()
+      unsubscribeSlideAdd?.()
+      unsubscribePresentationUpdate?.()
+    }
+  }, [nickname, presentationId, onTextBlockUpdate, onTextBlockAdd, onTextBlockDelete, onSlideAdd, onPresentationUpdate])
 
   const fetchPresentation = async () => {
     try {
+      setLoading(true)
       const response = await fetch(`/api/presentations/${presentationId}`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch presentation')
+      }
+      
       const data = await response.json()
       
       if (data.success) {
         setPresentation(data.presentation)
+        // Select first slide by default
+        if (data.presentation.slides?.length > 0 && !selectedSlideId) {
+          setSelectedSlideId(data.presentation.slides[0].id)
+        }
       } else {
-        setError('Presentation not found')
+        throw new Error(data.error || 'Failed to load presentation')
       }
     } catch (err) {
-      setError('Failed to load presentation')
+      console.error('Error fetching presentation:', err)
+      setError(err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const generateTextBlockId = () => {
-    return `text_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-  }
+  const handleAddSlide = async () => {
+    if (!isCreator) return
 
-  const handleCanvasClick = (e) => {
-    const canvas = e.currentTarget
-    const rect = canvas.getBoundingClientRect()
-    const x = e.clientX - rect.left - 20 // Offset for padding
-    const y = e.clientY - rect.top - 20
-
-    // Don't create if clicking on existing text block
-    if (e.target !== canvas) return
-
-    const newTextBlock = {
-      id: generateTextBlockId(),
-      x: Math.max(0, x),
-      y: Math.max(0, y),
-      width: 200,
-      height: 50,
-      content: 'New text block',
-      fontSize: 16,
-      fontWeight: 'normal',
-      color: '#000000',
-      backgroundColor: 'transparent',
-      textAlign: 'left',
-      zIndex: 1
-    }
-
-    const updatedPresentation = { ...presentation }
-    const currentSlide = updatedPresentation.slides[currentSlideIndex]
-    
-    if (!currentSlide.textBlocks) {
-      currentSlide.textBlocks = []
-    }
-    
-    currentSlide.textBlocks.push(newTextBlock)
-    setPresentation(updatedPresentation)
-    setSelectedTextBlockId(newTextBlock.id)
-
-    // Save to backend
-    updateSlideInBackend(currentSlide)
-  }
-
-  const handleTextBlockUpdate = (updatedTextBlock) => {
-    const updatedPresentation = { ...presentation }
-    const currentSlide = updatedPresentation.slides[currentSlideIndex]
-    
-    const textBlockIndex = currentSlide.textBlocks.findIndex(
-      tb => tb.id === updatedTextBlock.id
-    )
-    
-    if (textBlockIndex !== -1) {
-      currentSlide.textBlocks[textBlockIndex] = updatedTextBlock
-      setPresentation(updatedPresentation)
-      
-      // Save to backend
-      updateSlideInBackend(currentSlide)
-    }
-  }
-
-  const handleTextBlockDelete = (textBlockId) => {
-    const updatedPresentation = { ...presentation }
-    const currentSlide = updatedPresentation.slides[currentSlideIndex]
-    
-    currentSlide.textBlocks = currentSlide.textBlocks.filter(
-      tb => tb.id !== textBlockId
-    )
-    
-    setPresentation(updatedPresentation)
-    setSelectedTextBlockId(null)
-    
-    // Save to backend
-    updateSlideInBackend(currentSlide)
-  }
-
-  const updateSlideInBackend = async (slide) => {
     try {
-      await fetch(`/api/presentations/${presentationId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch(`/api/presentations/${presentationId}/slides`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          slides: presentation.slides
-        })
+          createdBy: nickname,
+          title: `Slide ${presentation.slides.length + 1}`
+        }),
       })
-    } catch (error) {
-      console.error('Error updating slide:', error)
+
+      if (!response.ok) {
+        throw new Error('Failed to add slide')
+      }
+
+      const data = await response.json()
+      
+      if (data.success) {
+        // Emit real-time update
+        emitSlideAdd(data.slide)
+        
+        // Refresh presentation data
+        await fetchPresentation()
+        // Select the new slide
+        if (data.slide) {
+          setSelectedSlideId(data.slide.id)
+        }
+      } else {
+        throw new Error(data.error || 'Failed to add slide')
+      }
+    } catch (err) {
+      console.error('Error adding slide:', err)
+      alert('Failed to add slide: ' + err.message)
     }
   }
 
-  const handleSlideSelect = (index) => {
-    setCurrentSlideIndex(index)
-    setSelectedTextBlockId(null)
+  const handleSlideSelect = (slideId) => {
+    setSelectedSlideId(slideId)
+  }
+
+  const handleTextBlockUpdate = async (slideId, blockId, updates) => {
+    try {
+      // Find the slide and update the text block
+      const updatedSlides = presentation.slides.map(slide => {
+        if (slide.id === slideId) {
+          const updatedTextBlocks = slide.textBlocks.map(block => 
+            block.id === blockId ? { ...block, ...updates } : block
+          )
+          return { ...slide, textBlocks: updatedTextBlocks }
+        }
+        return slide
+      })
+
+      // Update local state immediately for responsiveness
+      setPresentation(prev => ({ ...prev, slides: updatedSlides }))
+
+      // Emit real-time update
+      emitTextBlockUpdate(slideId, blockId, updates)
+
+      // Send update to backend
+      const response = await fetch(`/api/presentations/${presentationId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          slides: updatedSlides
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update presentation')
+      }
+
+      const data = await response.json()
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to update presentation')
+      }
+    } catch (err) {
+      console.error('Error updating text block:', err)
+      // Revert local changes on error
+      fetchPresentation()
+    }
+  }
+
+  const handleTextBlockAdd = async (slideId, position) => {
+    if (userRole === 'Viewer') return
+
+    try {
+      const newBlock = {
+        id: `block_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        content: 'New text block',
+        x: position.x,
+        y: position.y,
+        width: 200,
+        height: 50,
+        fontSize: 16,
+        fontFamily: 'Arial',
+        color: '#000000',
+        backgroundColor: 'transparent'
+      }
+
+      const updatedSlides = presentation.slides.map(slide => {
+        if (slide.id === slideId) {
+          return { 
+            ...slide, 
+            textBlocks: [...(slide.textBlocks || []), newBlock] 
+          }
+        }
+        return slide
+      })
+
+      // Update local state immediately
+      setPresentation(prev => ({ ...prev, slides: updatedSlides }))
+
+      // Emit real-time update
+      emitTextBlockAdd(slideId, newBlock)
+
+      // Send update to backend
+      const response = await fetch(`/api/presentations/${presentationId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          slides: updatedSlides
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to add text block')
+      }
+
+      const data = await response.json()
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to add text block')
+      }
+    } catch (err) {
+      console.error('Error adding text block:', err)
+      // Revert local changes on error
+      fetchPresentation()
+    }
+  }
+
+  const handleTextBlockDelete = async (slideId, blockId) => {
+    if (userRole === 'Viewer') return
+
+    try {
+      const updatedSlides = presentation.slides.map(slide => {
+        if (slide.id === slideId) {
+          return { 
+            ...slide, 
+            textBlocks: slide.textBlocks.filter(block => block.id !== blockId)
+          }
+        }
+        return slide
+      })
+
+      // Update local state immediately
+      setPresentation(prev => ({ ...prev, slides: updatedSlides }))
+
+      // Emit real-time update
+      emitTextBlockDelete(slideId, blockId)
+
+      // Send update to backend
+      const response = await fetch(`/api/presentations/${presentationId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          slides: updatedSlides
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete text block')
+      }
+
+      const data = await response.json()
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to delete text block')
+      }
+    } catch (err) {
+      console.error('Error deleting text block:', err)
+      // Revert local changes on error
+      fetchPresentation()
+    }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl">Loading presentation...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading presentation...</p>
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="text-xl text-red-600 mb-4">{error}</div>
-          <a href="/" className="text-blue-600 hover:underline">
-            ← Back to presentations
-          </a>
+          <div className="text-red-600 text-xl mb-4">⚠️ Error</div>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button 
+            onClick={fetchPresentation}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     )
   }
 
-  const currentSlide = presentation?.slides?.[currentSlideIndex]
-  const canEdit = presentation?.createdBy === nickname
+  if (!presentation) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-gray-600">Presentation not found</p>
+      </div>
+    )
+  }
+
+  const currentSlide = presentation.slides?.find(slide => slide.id === selectedSlideId)
+  const displayConnectedUsers = socketConnectedUsers.length > 0 ? socketConnectedUsers : presentation.connectedUsers || []
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
       {/* Top Toolbar */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3">
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <a href="/" className="text-gray-600 hover:text-gray-900">
-              ← Back
-            </a>
-            <h1 className="text-xl font-semibold text-gray-900">
-              {presentation?.title || 'Untitled Presentation'}
-            </h1>
+          <div>
+            <h1 className="text-xl font-semibold text-gray-800">{presentation.title}</h1>
+            <p className="text-sm text-gray-600">
+              Created by {presentation.createdBy} • {presentation.slides?.length || 0} slides
+            </p>
           </div>
-          
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">
-              {nickname && `${nickname} • `}
-              {canEdit ? 'Editor' : 'Viewer'}
-            </span>
-            <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-              Present
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span className="text-sm text-gray-600">
+                {isConnected ? 'Connected' : 'Disconnected'}
+              </span>
+            </div>
+            <div className="text-sm text-gray-600">
+              Role: <span className="font-medium">{userRole}</span>
+            </div>
+            <div className="text-sm text-gray-600">
+              User: <span className="font-medium">{nickname}</span>
+            </div>
+            <button
+              onClick={() => window.open(`/presentation/${presentationId}/present`, '_blank')}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors duration-200 flex items-center space-x-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h1m4 0h1m6-10V7a3 3 0 01-3 3H6a3 3 0 01-3-3V4a3 3 0 013-3h8a3 3 0 013 3v3z" />
+              </svg>
+              <span>Present</span>
             </button>
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* Main Editor Area */}
+      {/* Main Content */}
       <div className="flex-1 flex">
         {/* Left Panel - Slides */}
-        <div className="w-64 bg-white border-r border-gray-200 p-4">
-          <h3 className="font-medium text-gray-900 mb-4">Slides</h3>
-          <div className="space-y-2">
-            {presentation?.slides?.map((slide, index) => (
-              <div
-                key={slide.id}
-                onClick={() => handleSlideSelect(index)}
-                className={`aspect-video bg-gray-50 border-2 rounded p-2 cursor-pointer transition-colors ${
-                  index === currentSlideIndex 
-                    ? 'border-blue-500 bg-blue-50' 
-                    : 'border-gray-200 hover:border-blue-300'
-                }`}
-              >
-                <div className="text-xs text-gray-600">
-                  {index + 1}. {slide.title}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {slide.textBlocks?.length || 0} text blocks
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <SlidePanel
+          slides={presentation.slides || []}
+          selectedSlideId={selectedSlideId}
+          onSlideSelect={handleSlideSelect}
+          onAddSlide={handleAddSlide}
+          userRole={userRole}
+          isCreator={isCreator}
+        />
 
-        {/* Center Panel - Main Canvas */}
-        <div className="flex-1 p-8">
-          <div className="bg-white shadow-lg rounded-lg aspect-video max-w-4xl mx-auto relative overflow-hidden">
-            {/* Canvas Area */}
-            <div 
-              className="absolute inset-4 rounded cursor-crosshair"
-              onClick={canEdit ? handleCanvasClick : undefined}
-              style={{ backgroundColor: currentSlide?.backgroundColor || '#ffffff' }}
-            >
-              {/* Text Blocks */}
-              {currentSlide?.textBlocks?.map((textBlock) => (
-                <TextBlock
-                  key={textBlock.id}
-                  textBlock={textBlock}
-                  onUpdate={handleTextBlockUpdate}
-                  onDelete={handleTextBlockDelete}
-                  isSelected={selectedTextBlockId === textBlock.id}
-                  onSelect={setSelectedTextBlockId}
-                  canEdit={canEdit}
-                />
-              ))}
-              
-              {/* Empty State */}
-              {(!currentSlide?.textBlocks || currentSlide.textBlocks.length === 0) && (
-                <div className="absolute inset-0 flex items-center justify-center border-2 border-dashed border-gray-300 rounded">
-                  <div className="text-center text-gray-500">
-                    <div className="text-lg mb-2">
-                      {canEdit ? 'Click to add text blocks' : 'No content yet'}
-                    </div>
-                    {canEdit && (
-                      <div className="text-sm">Double-click text to edit</div>
-                    )}
-                  </div>
+        {/* Center Panel - Canvas */}
+        <div className="flex-1 flex flex-col">
+          <div className="flex-1 bg-white m-4 rounded-lg shadow-sm border border-gray-200 relative overflow-hidden">
+            {currentSlide ? (
+              <div 
+                className="w-full h-full relative"
+                style={{ backgroundColor: currentSlide.backgroundColor || '#ffffff' }}
+                onClick={(e) => {
+                  if (userRole !== 'Viewer' && e.target === e.currentTarget) {
+                    const rect = e.currentTarget.getBoundingClientRect()
+                    const position = {
+                      x: e.clientX - rect.left,
+                      y: e.clientY - rect.top
+                    }
+                    handleTextBlockAdd(currentSlide.id, position)
+                  }
+                }}
+              >
+                {/* Slide Title */}
+                <div className="absolute top-4 left-4 right-4">
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                    {currentSlide.title}
+                  </h2>
                 </div>
-              )}
-            </div>
+
+                {/* Text Blocks */}
+                {currentSlide.textBlocks?.map((block) => (
+                  <TextBlock
+                    key={block.id}
+                    block={block}
+                    onUpdate={(updates) => handleTextBlockUpdate(currentSlide.id, block.id, updates)}
+                    onDelete={() => handleTextBlockDelete(currentSlide.id, block.id)}
+                    disabled={userRole === 'Viewer'}
+                  />
+                ))}
+
+                {/* Instructions */}
+                {userRole !== 'Viewer' && (!currentSlide.textBlocks || currentSlide.textBlocks.length === 0) && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="text-gray-400 text-center">
+                      <p className="text-lg mb-2">Click anywhere to add a text block</p>
+                      <p className="text-sm">Double-click text blocks to edit them</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-400">
+                <p>Select a slide to start editing</p>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Right Panel - Users */}
-        <div className="w-64 bg-white border-l border-gray-200 p-4">
-          <h3 className="font-medium text-gray-900 mb-4">Connected Users</h3>
+        <div className="w-64 bg-gray-50 border-l border-gray-200 p-4">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Connected Users</h3>
           <div className="space-y-2">
-            <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-sm">{presentation?.createdBy} (Creator)</span>
-            </div>
-            {nickname && nickname !== presentation?.createdBy && (
-              <div className="flex items-center gap-2 p-2 bg-blue-50 rounded">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-sm">{nickname} (You)</span>
+            {displayConnectedUsers.map((user, index) => (
+              <div key={index} className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200">
+                <div>
+                  <div className="font-medium text-gray-800">{user.nickname}</div>
+                  <div className="text-xs text-gray-500">{user.role}</div>
+                </div>
+                <div className={`w-2 h-2 rounded-full ${user.isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
               </div>
+            )) || (
+              <div className="text-gray-500 text-sm">No users connected</div>
             )}
+          </div>
+          
+          {/* Connection Status */}
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="text-xs text-gray-500 text-center">
+              WebSocket: {isConnected ? 'Connected' : 'Disconnected'}
+              <br />
+              {displayConnectedUsers.length} user{displayConnectedUsers.length !== 1 ? 's' : ''} online
+            </div>
           </div>
         </div>
       </div>

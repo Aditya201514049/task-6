@@ -1,0 +1,139 @@
+'use client'
+
+import { useState } from 'react'
+
+export default function SlidePanel({ 
+  slides = [], 
+  selectedSlideId, 
+  onSlideSelect, 
+  onAddSlide, 
+  userRole, 
+  isCreator 
+}) {
+  const [isAddingSlide, setIsAddingSlide] = useState(false)
+
+  const handleAddSlide = async () => {
+    if (!isCreator || isAddingSlide) return
+    
+    setIsAddingSlide(true)
+    try {
+      await onAddSlide()
+    } finally {
+      setIsAddingSlide(false)
+    }
+  }
+
+  return (
+    <div className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col">
+      {/* Header */}
+      <div className="p-4 border-b border-gray-200">
+        <h2 className="text-lg font-semibold text-gray-800">Slides</h2>
+        <p className="text-sm text-gray-600">{slides.length} slide{slides.length !== 1 ? 's' : ''}</p>
+      </div>
+
+      {/* Slides List */}
+      <div className="flex-1 overflow-y-auto p-2">
+        {slides.map((slide, index) => (
+          <div
+            key={slide.id}
+            onClick={() => onSlideSelect(slide.id)}
+            className={`
+              mb-2 p-3 rounded-lg cursor-pointer transition-all duration-200
+              ${selectedSlideId === slide.id 
+                ? 'bg-blue-100 border-2 border-blue-500 shadow-md' 
+                : 'bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm'
+              }
+            `}
+          >
+            {/* Slide Thumbnail */}
+            <div className="aspect-video bg-white border border-gray-200 rounded mb-2 relative overflow-hidden">
+              {/* Mini preview of text blocks */}
+              {slide.textBlocks && slide.textBlocks.length > 0 ? (
+                <div className="p-1">
+                  {slide.textBlocks.slice(0, 3).map((block, blockIndex) => (
+                    <div
+                      key={blockIndex}
+                      className="text-xs text-gray-600 mb-1 truncate"
+                      style={{
+                        fontSize: '6px',
+                        lineHeight: '8px'
+                      }}
+                    >
+                      {block.content || 'Text block'}
+                    </div>
+                  ))}
+                  {slide.textBlocks.length > 3 && (
+                    <div className="text-xs text-gray-400" style={{ fontSize: '6px' }}>
+                      +{slide.textBlocks.length - 3} more
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-400">
+                  <div className="text-xs">Empty slide</div>
+                </div>
+              )}
+              
+              {/* Slide number overlay */}
+              <div className="absolute top-1 left-1 bg-gray-800 text-white text-xs px-1 rounded">
+                {index + 1}
+              </div>
+            </div>
+
+            {/* Slide Title */}
+            <div className="text-sm font-medium text-gray-800 truncate">
+              {slide.title || `Slide ${index + 1}`}
+            </div>
+            
+            {/* Slide Info */}
+            <div className="text-xs text-gray-500 mt-1">
+              {slide.textBlocks?.length || 0} text block{(slide.textBlocks?.length || 0) !== 1 ? 's' : ''}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Add Slide Button */}
+      {isCreator && (
+        <div className="p-4 border-t border-gray-200">
+          <button
+            onClick={handleAddSlide}
+            disabled={isAddingSlide}
+            className={`
+              w-full py-2 px-4 rounded-lg font-medium transition-all duration-200
+              ${isAddingSlide
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md'
+              }
+            `}
+          >
+            {isAddingSlide ? (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-500 mr-2"></div>
+                Adding...
+              </div>
+            ) : (
+              <div className="flex items-center justify-center">
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Slide
+              </div>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Role indicator for non-creators */}
+      {!isCreator && (
+        <div className="p-4 border-t border-gray-200">
+          <div className="text-xs text-gray-500 text-center">
+            Role: {userRole}
+            <br />
+            {userRole === 'Viewer' ? 'View only' : 'Can edit slides'}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
