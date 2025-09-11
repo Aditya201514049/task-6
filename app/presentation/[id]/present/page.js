@@ -1,8 +1,9 @@
-
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import useSocket from '../../../hooks/useSocket'
 
 export default function PresentMode() {
@@ -40,6 +41,25 @@ export default function PresentMode() {
       fetchPresentation()
     }
   }, [presentationId])
+
+  // Configure marked for safe rendering
+  marked.setOptions({
+    breaks: true,
+    gfm: true,
+    headerIds: false,
+    mangle: false
+  })
+
+  const renderMarkdown = (content) => {
+    if (!content) return ''
+    try {
+      const html = marked(content)
+      return DOMPurify.sanitize(html)
+    } catch (error) {
+      console.error('Markdown parsing error:', error)
+      return content
+    }
+  }
 
   // Set up real-time event listeners
   useEffect(() => {
@@ -308,29 +328,48 @@ export default function PresentMode() {
           </div>
 
           {/* Text Blocks */}
-          {currentSlide.textBlocks?.map((block) => (
-            <div
-              key={block.id}
-              className="absolute pointer-events-none"
-              style={{
-                left: `${block.x}px`,
-                top: `${block.y}px`,
-                width: `${block.width}px`,
-                minHeight: `${block.height}px`,
-                fontSize: `${block.fontSize * 1.5}px`, // Scale up for presentation
-                fontFamily: block.fontFamily || 'Arial',
-                color: block.color || '#000000',
-                backgroundColor: block.backgroundColor || 'transparent',
-                padding: '8px',
-                borderRadius: '4px',
-                lineHeight: '1.4',
-                wordWrap: 'break-word',
-                whiteSpace: 'pre-wrap'
-              }}
-            >
-              {block.content}
-            </div>
-          ))}
+          {currentSlide.textBlocks?.map((block) => {
+            const shouldUseMarkdown = block.isMarkdown !== false && (block.isMarkdown || block.content?.includes('**') || block.content?.includes('*') || block.content?.includes('#'))
+            
+            return (
+              <div
+                key={block.id}
+                className="absolute pointer-events-none"
+                style={{
+                  left: `${block.x}px`,
+                  top: `${block.y}px`,
+                  width: `${block.width}px`,
+                  minHeight: `${block.height}px`,
+                  fontSize: `${(block.fontSize || 16) * 1.5}px`, // Scale up for presentation
+                  fontFamily: block.fontFamily || 'Arial',
+                  color: block.color || '#000000',
+                  backgroundColor: block.backgroundColor || 'transparent',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  lineHeight: '1.4',
+                  wordWrap: 'break-word'
+                }}
+              >
+                {shouldUseMarkdown ? (
+                  <div
+                    className="markdown-content"
+                    dangerouslySetInnerHTML={{
+                      __html: renderMarkdown(block.content || '')
+                    }}
+                    style={{
+                      fontSize: `${(block.fontSize || 16) * 1.5}px`,
+                      fontFamily: block.fontFamily || 'Arial',
+                      color: block.color || '#000000'
+                    }}
+                  />
+                ) : (
+                  <div style={{ whiteSpace: 'pre-wrap' }}>
+                    {block.content}
+                  </div>
+                )}
+              </div>
+            )
+          })}
 
           {/* Empty slide message */}
           {(!currentSlide.textBlocks || currentSlide.textBlocks.length === 0) && (

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import TextBlock from '../../components/TextBlock'
+import MarkdownTextBlock from '../../components/MarkdownTextBlock'
 import SlidePanel from '../../components/SlidePanel'
 import useSocket from '../../hooks/useSocket'
 
@@ -15,6 +16,7 @@ export default function PresentationEditor() {
   const [error, setError] = useState(null)
   const [selectedSlideId, setSelectedSlideId] = useState(null)
   const [nickname, setNickname] = useState('')
+  const [useMarkdown, setUseMarkdown] = useState(true) // Default to markdown mode
 
   // Initialize WebSocket connection
   const {
@@ -257,7 +259,7 @@ export default function PresentationEditor() {
     try {
       const newBlock = {
         id: `block_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        content: 'New text block',
+        content: useMarkdown ? '**New text block**\n\nDouble-click to edit with markdown support!' : 'New text block',
         x: position.x,
         y: position.y,
         width: 200,
@@ -265,7 +267,8 @@ export default function PresentationEditor() {
         fontSize: 16,
         fontFamily: 'Arial',
         color: '#000000',
-        backgroundColor: 'transparent'
+        backgroundColor: 'transparent',
+        isMarkdown: useMarkdown
       }
 
       const updatedSlides = presentation.slides.map(slide => {
@@ -413,6 +416,29 @@ export default function PresentationEditor() {
                 {isConnected ? 'Connected' : 'Disconnected'}
               </span>
             </div>
+            
+            {/* Markdown Toggle */}
+            {userRole !== 'Viewer' && (
+              <div className="flex items-center space-x-2">
+                <label className="text-sm text-gray-600">Markdown:</label>
+                <button
+                  onClick={() => setUseMarkdown(!useMarkdown)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    useMarkdown ? 'bg-blue-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      useMarkdown ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <span className="text-xs text-gray-500">
+                  {useMarkdown ? 'Rich text' : 'Plain text'}
+                </span>
+              </div>
+            )}
+            
             <div className="text-sm text-gray-600">
               Role: <span className="font-medium">{userRole}</span>
             </div>
@@ -470,21 +496,37 @@ export default function PresentationEditor() {
                 </div>
 
                 {/* Text Blocks */}
-                {currentSlide.textBlocks?.map((block) => (
-                  <TextBlock
-                    key={block.id}
-                    block={block}
-                    onUpdate={(updates) => handleTextBlockUpdate(currentSlide.id, block.id, updates)}
-                    onDelete={() => handleTextBlockDelete(currentSlide.id, block.id)}
-                    disabled={userRole === 'Viewer'}
-                  />
-                ))}
+                {currentSlide.textBlocks?.map((block) => {
+                  // Use MarkdownTextBlock for blocks with markdown support or when markdown is enabled
+                  const shouldUseMarkdown = block.isMarkdown !== false && (block.isMarkdown || useMarkdown)
+                  
+                  return shouldUseMarkdown ? (
+                    <MarkdownTextBlock
+                      key={block.id}
+                      block={block}
+                      onUpdate={(updates) => handleTextBlockUpdate(currentSlide.id, block.id, updates)}
+                      onDelete={() => handleTextBlockDelete(currentSlide.id, block.id)}
+                      disabled={userRole === 'Viewer'}
+                    />
+                  ) : (
+                    <TextBlock
+                      key={block.id}
+                      block={block}
+                      onUpdate={(updates) => handleTextBlockUpdate(currentSlide.id, block.id, updates)}
+                      onDelete={() => handleTextBlockDelete(currentSlide.id, block.id)}
+                      disabled={userRole === 'Viewer'}
+                    />
+                  )
+                })}
 
                 {/* Instructions */}
                 {userRole !== 'Viewer' && (!currentSlide.textBlocks || currentSlide.textBlocks.length === 0) && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="text-gray-400 text-center">
                       <p className="text-lg mb-2">Click anywhere to add a text block</p>
+                      <p className="text-sm">
+                        {useMarkdown ? 'Markdown mode: Use **bold**, *italic*, ## headers, - lists' : 'Plain text mode'}
+                      </p>
                       <p className="text-sm">Double-click text blocks to edit them</p>
                     </div>
                   </div>
