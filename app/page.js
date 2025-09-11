@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import PresentationCard from './components/PresentationCard'
 import NicknameModal from './components/NicknameModal'
+import CreatePresentationModal from './components/CreatePresentationModal'
 
 export default function Home() {
   const [presentations, setPresentations] = useState([])
   const [loading, setLoading] = useState(true)
   const [showNicknameModal, setShowNicknameModal] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [nickname, setNickname] = useState('')
   const [actionType, setActionType] = useState('') // 'create' or 'join'
   const [selectedPresentationId, setSelectedPresentationId] = useState('')
@@ -43,7 +45,7 @@ export default function Home() {
       setActionType('create')
       setShowNicknameModal(true)
     } else {
-      createNewPresentation()
+      setShowCreateModal(true)
     }
   }
 
@@ -57,24 +59,28 @@ export default function Home() {
     }
   }
 
-  const createNewPresentation = async () => {
+  const createNewPresentation = async (presentationData) => {
     try {
       const response = await fetch('/api/presentations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: 'Untitled Presentation',
-          createdBy: nickname,
-          description: 'A new collaborative presentation'
+          title: presentationData.title,
+          description: presentationData.description,
+          createdBy: nickname
         })
       })
       
       const data = await response.json()
       if (data.success) {
+        setShowCreateModal(false)
         router.push(`/presentation/${data.presentation.id}`)
+      } else {
+        throw new Error(data.error || 'Failed to create presentation')
       }
     } catch (error) {
       console.error('Error creating presentation:', error)
+      throw error
     }
   }
 
@@ -88,10 +94,15 @@ export default function Home() {
     setShowNicknameModal(false)
     
     if (actionType === 'create') {
-      createNewPresentation()
+      setShowCreateModal(true)
     } else if (actionType === 'join') {
       joinPresentation(selectedPresentationId)
     }
+  }
+
+  const handleLogout = () => {
+    setNickname('')
+    localStorage.removeItem('userNickname')
   }
 
   if (loading) {
@@ -113,9 +124,17 @@ export default function Home() {
             </h1>
             <div className="flex items-center gap-4">
               {nickname && (
-                <span className="text-sm text-gray-600">
-                  Welcome, <span className="font-medium">{nickname}</span>
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-600">
+                    Welcome, <span className="font-medium">{nickname}</span>
+                  </span>
+                  <button
+                    onClick={handleLogout}
+                    className="text-sm text-red-600 hover:text-red-700 underline"
+                  >
+                    Logout
+                  </button>
+                </div>
               )}
               <button
                 onClick={handleCreatePresentation}
@@ -160,6 +179,14 @@ export default function Home() {
         <NicknameModal
           onSubmit={handleNicknameSubmit}
           onClose={() => setShowNicknameModal(false)}
+        />
+      )}
+
+      {/* Create Presentation Modal */}
+      {showCreateModal && (
+        <CreatePresentationModal
+          onSubmit={createNewPresentation}
+          onClose={() => setShowCreateModal(false)}
         />
       )}
     </div>
