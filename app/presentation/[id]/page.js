@@ -40,7 +40,7 @@ export default function PresentationEditor() {
 
   useEffect(() => {
     // Get nickname from localStorage
-    const storedNickname = localStorage.getItem('nickname')
+    const storedNickname = localStorage.getItem('userNickname')
     if (storedNickname) {
       setNickname(storedNickname)
     }
