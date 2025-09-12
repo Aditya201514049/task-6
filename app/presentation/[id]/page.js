@@ -179,7 +179,7 @@ export default function PresentationEditor() {
   }
 
   const handleAddSlide = async () => {
-    if (!isCreator) return
+    if (!isCreator && userRole !== 'Editor') return
 
     try {
       const response = await fetch(`/api/presentations/${presentationId}/slides`, {
@@ -193,11 +193,11 @@ export default function PresentationEditor() {
         }),
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to add slide')
-      }
-
       const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}: Failed to add slide`)
+      }
       
       if (data.success) {
         // Emit real-time update

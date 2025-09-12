@@ -13,7 +13,7 @@ export default function SlidePanel({
   const [isAddingSlide, setIsAddingSlide] = useState(false)
 
   const handleAddSlide = async () => {
-    if (!isCreator || isAddingSlide) return
+    if ((!isCreator && userRole !== 'Editor') || isAddingSlide) return
     
     setIsAddingSlide(true)
     try {
@@ -94,7 +94,7 @@ export default function SlidePanel({
       </div>
 
       {/* Add Slide Button */}
-      {isCreator && (
+      {(isCreator || userRole === 'Editor') && (
         <div className="p-4 border-t border-gray-200">
           <button
             onClick={handleAddSlide}
@@ -125,7 +125,7 @@ export default function SlidePanel({
       )}
 
       {/* Role indicator for non-creators */}
-      {!isCreator && (
+      {!isCreator && userRole !== 'Editor' && (
         <div className="p-4 border-t border-gray-200">
           <div className="text-xs text-gray-500 text-center">
             Role: {userRole}
