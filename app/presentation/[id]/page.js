@@ -17,11 +17,13 @@ export default function PresentationEditor() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [useMarkdown, setUseMarkdown] = useState(false)
-  const [userRole, setUserRole] = useState('Viewer')
+  const [userRole, setUserRole] = useState('viewer')
   const [isCreator, setIsCreator] = useState(false)
   const [hasAccess, setHasAccess] = useState(false)
   const [nickname, setNickname] = useState('')
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, slidePosition: null })
+  const [editingPresentationTitle, setEditingPresentationTitle] = useState(false)
+  const [editingTitle, setEditingTitle] = useState('')
 
   // Initialize WebSocket connection - but wait for role to be determined
   const {
@@ -219,7 +221,7 @@ export default function PresentationEditor() {
       if (response.ok) {
         const data = await response.json()
         if (data.success) {
-          setUserRole(data.role || 'Viewer')
+          setUserRole(data.role || 'viewer')
           setIsCreator(data.isCreator || false)
           setHasAccess(data.hasAccess || false)
         }
@@ -233,18 +235,18 @@ export default function PresentationEditor() {
         
         setIsCreator(isCreatorFallback)
         if (isCreatorFallback) {
-          setUserRole('Creator')
+          setUserRole('creator')
         } else if (authorizedUser) {
-          setUserRole(authorizedUser.role === 'editor' ? 'Editor' : 'Viewer')
+          setUserRole(authorizedUser.role === 'editor' ? 'editor' : 'viewer')
         } else {
-          setUserRole('Viewer')
+          setUserRole('viewer')
         }
       }
     }
   }
 
   const handleAddSlide = async () => {
-    if (!isCreator && userRole !== 'Editor') return
+    if (!isCreator && userRole !== 'editor') return
 
     try {
       const response = await fetch(`/api/presentations/${presentationId}/slides`, {
@@ -329,8 +331,6 @@ export default function PresentationEditor() {
   }
 
   const handleTextBlockUpdate = async (slideId, updatedBlock) => {
-    console.log('handleTextBlockUpdate called with:', { slideId, updatedBlock })
-    
     try {
       // Find the slide and update the text block
       const updatedSlides = presentation.slides.map(slide => {
@@ -338,14 +338,11 @@ export default function PresentationEditor() {
           const updatedTextBlocks = slide.textBlocks.map(block => 
             block.id === updatedBlock.id ? updatedBlock : block
           )
-          console.log('Updated textBlocks for slide:', updatedTextBlocks)
           return { ...slide, textBlocks: updatedTextBlocks }
         }
         return slide
       })
 
-      console.log('About to update presentation state with slides:', updatedSlides)
-      
       // Update local state immediately for responsiveness
       setPresentation(prev => ({ ...prev, slides: updatedSlides }))
 
@@ -371,8 +368,6 @@ export default function PresentationEditor() {
       if (!data.success) {
         throw new Error(data.error || 'Failed to update presentation')
       }
-
-      console.log('Backend update successful')
     } catch (err) {
       console.error('Error updating text block:', err)
       // Revert local changes on error
@@ -381,7 +376,7 @@ export default function PresentationEditor() {
   }
 
   const handleTextBlockAdd = async (slideId, position) => {
-    if (userRole === 'Viewer') return
+    if (userRole === 'viewer') return
 
     try {
       const newBlock = {
@@ -441,7 +436,7 @@ export default function PresentationEditor() {
   }
 
   const handleTextBlockDelete = async (slideId, blockId) => {
-    if (userRole === 'Viewer') return
+    if (userRole === 'viewer') return
 
     try {
       const updatedSlides = presentation.slides.map(slide => {
@@ -512,12 +507,6 @@ export default function PresentationEditor() {
   // Show only currently connected users (live presence)
   const displayConnectedUsers = socketConnectedUsers || []
   
-  // Debug logging
-  console.log('Debug - socketConnectedUsers:', socketConnectedUsers)
-  console.log('Debug - isConnected:', isConnected)
-  console.log('Debug - nickname:', nickname)
-  console.log('Debug - presentationId:', presentationId)
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -560,7 +549,45 @@ export default function PresentationEditor() {
       <div className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-gray-800">{presentation.title}</h1>
+            {editingPresentationTitle ? (
+              <input
+                type="text"
+                value={editingTitle}
+                onChange={(e) => setEditingTitle(e.target.value)}
+                className="text-xl font-semibold text-gray-800 w-64"
+                autoFocus
+                onBlur={() => {
+                  setEditingPresentationTitle(false)
+                  if (editingTitle !== presentation.title) {
+                    // Update presentation title
+                    setPresentation(prev => ({ ...prev, title: editingTitle }))
+                    // Send update to backend
+                    fetch(`/api/presentations/${presentationId}`, {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        title: editingTitle
+                      }),
+                    })
+                  }
+                }}
+              />
+            ) : (
+              <h1
+                className={`text-xl font-semibold text-gray-800 ${(userRole === 'creator' || userRole === 'editor') ? 'cursor-pointer hover:bg-gray-50 px-2 py-1 rounded' : ''}`}
+                onClick={() => {
+                  if (userRole === 'creator' || userRole === 'editor') {
+                    setEditingPresentationTitle(true)
+                    setEditingTitle(presentation.title)
+                  }
+                }}
+                title={(userRole === 'creator' || userRole === 'editor') ? 'Click to edit title' : ''}
+              >
+                {presentation.title}
+              </h1>
+            )}
             <p className="text-sm text-gray-600">
               Created by {presentation.createdBy} • {presentation.slides?.length || 0} slides
             </p>
@@ -574,7 +601,7 @@ export default function PresentationEditor() {
             </div>
             
             {/* Markdown Toggle */}
-            {userRole !== 'Viewer' && (
+            {userRole !== 'viewer' && (
               <div className="flex items-center space-x-2">
                 <label className="text-sm text-gray-600">Markdown:</label>
                 <button
@@ -642,7 +669,7 @@ export default function PresentationEditor() {
                 className="w-full h-full relative"
                 style={{ backgroundColor: currentSlide.backgroundColor || '#ffffff' }}
                 onContextMenu={(e) => {
-                  if (userRole !== 'Viewer') {
+                  if (userRole !== 'viewer') {
                     e.preventDefault()
                     const rect = e.currentTarget.getBoundingClientRect()
                     const position = {
@@ -680,7 +707,7 @@ export default function PresentationEditor() {
                       block={block}
                       onUpdate={(updatedBlock) => handleTextBlockUpdate(currentSlide.id, updatedBlock)}
                       onDelete={() => handleTextBlockDelete(currentSlide.id, block.id)}
-                      disabled={userRole === 'Viewer'}
+                      disabled={userRole === 'viewer'}
                     />
                   ) : (
                     <TextBlock
@@ -689,13 +716,13 @@ export default function PresentationEditor() {
                       onUpdate={(updatedBlock) => handleTextBlockUpdate(currentSlide.id, updatedBlock)}
                       onDelete={() => handleTextBlockDelete(currentSlide.id, block.id)}
                       onSelect={() => {}} // Add empty function to prevent error
-                      canEdit={userRole !== 'Viewer'}
+                      canEdit={userRole !== 'viewer'}
                     />
                   )
                 })}
 
                 {/* Instructions */}
-                {userRole !== 'Viewer' && (!currentSlide.textBlocks || currentSlide.textBlocks.length === 0) && (
+                {userRole !== 'viewer' && (!currentSlide.textBlocks || currentSlide.textBlocks.length === 0) && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="text-gray-400 text-center">
                       <p className="text-lg mb-2">Right-click to add a text block</p>
