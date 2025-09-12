@@ -157,9 +157,11 @@ presentationSchema.methods.getUserRole = function(nickname) {
     return authorizedUser.role
   }
   
-  // Check if presentation allows anonymous access
+  // Check if presentation allows public access
   if (this.settings.isPublic) {
-    return this.settings.allowAnonymousEdit ? 'editor' : 'viewer'
+    // Public users are always viewers, regardless of allowAnonymousEdit setting
+    // allowAnonymousEdit only affects whether they can edit content, not their display role
+    return 'viewer'
   }
   
   return null // No access

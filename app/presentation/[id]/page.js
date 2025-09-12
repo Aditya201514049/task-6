@@ -23,7 +23,7 @@ export default function PresentationEditor() {
   const [nickname, setNickname] = useState('')
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, slidePosition: null })
 
-  // Initialize WebSocket connection
+  // Initialize WebSocket connection - but wait for role to be determined
   const {
     isConnected,
     connectedUsers: socketConnectedUsers,
@@ -38,8 +38,20 @@ export default function PresentationEditor() {
     onTextBlockDelete,
     onSlideAdd,
     onSlideDelete,
-    onPresentationUpdate
+    onPresentationUpdate,
+    socket
   } = useSocket(presentationId, nickname, userRole)
+
+  // Update server with correct role when it's determined
+  useEffect(() => {
+    if (socket && isConnected && userRole && presentationId && nickname) {
+      socket.emit('update-user-role', {
+        presentationId,
+        nickname,
+        role: userRole
+      })
+    }
+  }, [socket, isConnected, userRole, presentationId, nickname])
 
   // Get current user info
   const authorizedUser = presentation?.authorizedUsers?.find(user => user.nickname === nickname)
