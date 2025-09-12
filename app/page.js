@@ -114,6 +114,37 @@ export default function Home() {
     setActionType('browse')
   }
 
+  const handleDeletePresentation = async (presentationId, presentationTitle) => {
+    // Confirm deletion
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${presentationTitle}"? This action cannot be undone.`
+    )
+    
+    if (!confirmed) return
+
+    try {
+      const response = await fetch(`/api/presentations/${presentationId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          createdBy: nickname
+        })
+      })
+      
+      const data = await response.json()
+      if (data.success) {
+        // Remove from local state
+        setPresentations(prev => prev.filter(p => p.id !== presentationId))
+        alert('Presentation deleted successfully')
+      } else {
+        throw new Error(data.error || 'Failed to delete presentation')
+      }
+    } catch (error) {
+      console.error('Error deleting presentation:', error)
+      alert('Failed to delete presentation: ' + error.message)
+    }
+  }
+
   // Show nickname modal if no nickname is set
   if (!nickname && !showNicknameModal) {
     return (
@@ -189,6 +220,8 @@ export default function Home() {
                 key={presentation.id}
                 presentation={presentation}
                 onJoin={() => handleJoinPresentation(presentation.id)}
+                onDelete={() => handleDeletePresentation(presentation.id, presentation.title)}
+                isCreator={presentation.createdBy === nickname}
               />
             ))}
           </div>
