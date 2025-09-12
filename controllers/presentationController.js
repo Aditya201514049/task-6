@@ -14,13 +14,44 @@ const presentationController = {
   // Get all presentations
   getAllPresentations: async (req, res) => {
     try {
+      const { nickname } = req.query
+      
+      console.log('getAllPresentations called with nickname:', nickname)
+      
       const presentations = await Presentation.find()
         .sort({ lastActivity: -1 })
         .limit(50)
-        .select('id title createdBy createdAt lastActivity connectedUsers slides')
+        .select('id title createdBy createdAt lastActivity connectedUsers slides settings authorizedUsers')
+      
+      console.log('Found presentations:', presentations.length)
+      
+      // Filter presentations based on user access
+      const accessiblePresentations = presentations.filter(pres => {
+        console.log(`Checking presentation "${pres.title}" (createdBy: ${pres.createdBy}, isPublic: ${pres.settings?.isPublic})`)
+        
+        if (!nickname) {
+          // No nickname provided - only show public presentations
+          const isPublic = pres.settings?.isPublic !== false
+          console.log(`No nickname - showing public only: ${isPublic}`)
+          return isPublic
+        }
+        
+        // Creators always see their own presentations
+        if (pres.createdBy === nickname) {
+          console.log(`Creator match: ${pres.createdBy} === ${nickname} - showing presentation`)
+          return true
+        }
+        
+        // For non-creators, check if user has access using the hasAccess method
+        const hasAccess = pres.hasAccess(nickname)
+        console.log(`Non-creator access check: ${hasAccess}`)
+        return hasAccess
+      })
+      
+      console.log('Accessible presentations:', accessiblePresentations.length)
       
       // Add online user count to each presentation
-      const presentationsWithUserCount = presentations.map(pres => ({
+      const presentationsWithUserCount = accessiblePresentations.map(pres => ({
         ...pres.toObject(),
         onlineUsers: pres.connectedUsers.filter(user => user.isOnline).length,
         totalSlides: pres.slides?.length || 0
@@ -29,7 +60,7 @@ const presentationController = {
       res.json({ 
         success: true, 
         presentations: presentationsWithUserCount,
-        total: presentations.length 
+        total: presentationsWithUserCount.length 
       })
     } catch (error) {
       console.error('Error fetching presentations:', error)
@@ -95,6 +126,7 @@ const presentationController = {
   getPresentationById: async (req, res) => {
     try {
       const { id } = req.params
+      const { nickname } = req.query
       
       if (!id) {
         return res.status(400).json({ 
@@ -109,6 +141,14 @@ const presentationController = {
         return res.status(404).json({ 
           success: false, 
           error: 'Presentation not found' 
+        })
+      }
+      
+      // Check if user has access to this presentation
+      if (nickname && !presentation.hasAccess(nickname)) {
+        return res.status(403).json({ 
+          success: false, 
+          error: 'Access denied. This presentation is private.' 
         })
       }
       
@@ -342,6 +382,46 @@ const presentationController = {
       res.status(500).json({ 
         success: false, 
         error: 'Failed to delete slide' 
+      })
+    }
+  },
+
+  // Add new getUserRole endpoint
+  getUserRole: async (req, res) => {
+    try {
+      const { id } = req.params
+      const { nickname } = req.query
+      
+      if (!id || !nickname) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Presentation ID and nickname are required' 
+        })
+      }
+      
+      const presentation = await Presentation.findOne({ id })
+      
+      if (!presentation) {
+        return res.status(404).json({ 
+          success: false, 
+          error: 'Presentation not found' 
+        })
+      }
+      
+      // Use the backend's getUserRole method
+      const userRole = presentation.getUserRole(nickname)
+      
+      res.json({ 
+        success: true, 
+        role: userRole,
+        isCreator: presentation.createdBy === nickname,
+        hasAccess: presentation.hasAccess(nickname)
+      })
+    } catch (error) {
+      console.error('Error getting user role:', error)
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to get user role' 
       })
     }
   }

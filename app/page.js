@@ -21,7 +21,7 @@ export default function Home() {
     const storedNickname = localStorage.getItem('userNickname')
     if (storedNickname) {
       setNickname(storedNickname)
-      fetchPresentations()
+      // Don't call fetchPresentations here - let the nickname useEffect handle it
     } else {
       // Show nickname modal immediately if no nickname
       setShowNicknameModal(true)
@@ -30,10 +30,23 @@ export default function Home() {
     }
   }, [])
 
+  // Refetch presentations when nickname changes
+  useEffect(() => {
+    if (nickname) {
+      fetchPresentations()
+    }
+  }, [nickname])
+
   const fetchPresentations = async () => {
     try {
-      const response = await fetch('/api/presentations')
+      console.log('fetchPresentations called with nickname:', nickname)
+      const url = nickname 
+        ? `/api/presentations?nickname=${encodeURIComponent(nickname)}`
+        : '/api/presentations'
+      console.log('Fetching from URL:', url)
+      const response = await fetch(url)
       const data = await response.json()
+      console.log('Presentations response:', data)
       if (data.success) {
         setPresentations(data.presentations)
       }

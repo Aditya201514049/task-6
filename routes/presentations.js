@@ -48,6 +48,9 @@ router.post('/:id/slides', presentationController.addSlide)
 // DELETE /api/presentations/:id/slides/:slideId - Delete slide
 router.delete('/:id/slides/:slideId', presentationController.deleteSlide)
 
+// GET /api/presentations/:id/role - Get user role for presentation
+router.get('/:id/role', presentationController.getUserRole)
+
 // POST /api/presentations/:id/users - Add user to presentation
 router.post('/:id/users', async (req, res) => {
   try {

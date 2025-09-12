@@ -13,11 +13,14 @@ export default function PresentationEditor() {
   const presentationId = params.id
 
   const [presentation, setPresentation] = useState(null)
+  const [selectedSlideId, setSelectedSlideId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [selectedSlideId, setSelectedSlideId] = useState(null)
+  const [useMarkdown, setUseMarkdown] = useState(false)
+  const [userRole, setUserRole] = useState('Viewer')
+  const [isCreator, setIsCreator] = useState(false)
+  const [hasAccess, setHasAccess] = useState(false)
   const [nickname, setNickname] = useState('')
-  const [useMarkdown, setUseMarkdown] = useState(true) // Default to markdown mode
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, slidePosition: null })
 
   // Initialize WebSocket connection
@@ -39,21 +42,8 @@ export default function PresentationEditor() {
   } = useSocket(presentationId, nickname)
 
   // Get current user info
-  const isCreator = presentation?.createdBy === nickname
-  
-  // Check authorized users for role
   const authorizedUser = presentation?.authorizedUsers?.find(user => user.nickname === nickname)
   const currentUser = presentation?.connectedUsers?.find(user => user.nickname === nickname)
-  
-  // Determine user role: Creator > Authorized User > Connected User > Default Viewer
-  let userRole = 'Viewer'
-  if (isCreator) {
-    userRole = 'Creator'
-  } else if (authorizedUser) {
-    userRole = authorizedUser.role === 'editor' ? 'Editor' : 'Viewer'
-  } else if (currentUser) {
-    userRole = currentUser.role === 'editor' ? 'Editor' : 'Viewer'
-  }
 
   useEffect(() => {
     // Get nickname from localStorage
@@ -68,6 +58,20 @@ export default function PresentationEditor() {
       fetchPresentation()
     }
   }, [presentationId])
+
+  // Fetch user role when nickname or presentation changes
+  useEffect(() => {
+    if (nickname && presentation) {
+      fetchUserRole()
+    }
+  }, [nickname, presentation, presentationId])
+
+  // Refetch presentation when nickname is available
+  useEffect(() => {
+    if (nickname && presentationId) {
+      fetchPresentation()
+    }
+  }, [nickname])
 
   // Set up real-time event listeners
   useEffect(() => {
@@ -191,6 +195,39 @@ export default function PresentationEditor() {
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchUserRole = async () => {
+    if (!nickname) return
+    
+    try {
+      const response = await fetch(`/api/presentations/${presentationId}/role?nickname=${encodeURIComponent(nickname)}`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setUserRole(data.role || 'Viewer')
+          setIsCreator(data.isCreator || false)
+          setHasAccess(data.hasAccess || false)
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching user role:', err)
+      // Fallback to basic role detection if API fails
+      if (presentation) {
+        const isCreatorFallback = presentation.createdBy === nickname
+        const authorizedUser = presentation.authorizedUsers?.find(user => user.nickname === nickname)
+        
+        setIsCreator(isCreatorFallback)
+        if (isCreatorFallback) {
+          setUserRole('Creator')
+        } else if (authorizedUser) {
+          setUserRole(authorizedUser.role === 'editor' ? 'Editor' : 'Viewer')
+        } else {
+          setUserRole('Viewer')
+        }
+      }
     }
   }
 
