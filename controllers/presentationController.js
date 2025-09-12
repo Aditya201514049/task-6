@@ -285,15 +285,13 @@ const presentationController = {
         })
       }
       
-      // Check if user is creator or has editor permissions
+      // Check if user is creator
       const isCreator = presentation.createdBy === createdBy
-      const authorizedUser = presentation.authorizedUsers?.find(user => user.nickname === createdBy)
-      const isEditor = authorizedUser?.role === 'editor'
       
-      if (!isCreator && !isEditor) {
+      if (!isCreator) {
         return res.status(403).json({ 
           success: false, 
-          error: 'Only creators and editors can add slides' 
+          error: 'Only creators can add slides' 
         })
       }
       
