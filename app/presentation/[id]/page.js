@@ -17,6 +17,7 @@ export default function PresentationEditor() {
   const [selectedSlideId, setSelectedSlideId] = useState(null)
   const [nickname, setNickname] = useState('')
   const [useMarkdown, setUseMarkdown] = useState(true) // Default to markdown mode
+  const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, slidePosition: null })
 
   // Initialize WebSocket connection
   const {
@@ -477,15 +478,25 @@ export default function PresentationEditor() {
               <div 
                 className="w-full h-full relative"
                 style={{ backgroundColor: currentSlide.backgroundColor || '#ffffff' }}
-                onClick={(e) => {
-                  if (userRole !== 'Viewer' && e.target === e.currentTarget) {
+                onContextMenu={(e) => {
+                  if (userRole !== 'Viewer') {
+                    e.preventDefault()
                     const rect = e.currentTarget.getBoundingClientRect()
                     const position = {
                       x: e.clientX - rect.left,
                       y: e.clientY - rect.top
                     }
-                    handleTextBlockAdd(currentSlide.id, position)
+                    setContextMenu({
+                      visible: true,
+                      x: e.clientX,
+                      y: e.clientY,
+                      slidePosition: position
+                    })
                   }
+                }}
+                onClick={() => {
+                  // Hide context menu on click
+                  setContextMenu({ visible: false, x: 0, y: 0, slidePosition: null })
                 }}
               >
                 {/* Slide Title */}
@@ -523,7 +534,7 @@ export default function PresentationEditor() {
                 {userRole !== 'Viewer' && (!currentSlide.textBlocks || currentSlide.textBlocks.length === 0) && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="text-gray-400 text-center">
-                      <p className="text-lg mb-2">Click anywhere to add a text block</p>
+                      <p className="text-lg mb-2">Right-click to add a text block</p>
                       <p className="text-sm">
                         {useMarkdown ? 'Markdown mode: Use **bold**, *italic*, ## headers, - lists' : 'Plain text mode'}
                       </p>
@@ -567,6 +578,42 @@ export default function PresentationEditor() {
           </div>
         </div>
       </div>
+
+      {/* Context Menu */}
+      {contextMenu.visible && (
+        <>
+          {/* Backdrop to close menu */}
+          <div 
+            className="fixed inset-0 z-40"
+            onClick={() => setContextMenu({ visible: false, x: 0, y: 0, slidePosition: null })}
+          />
+          
+          {/* Context Menu */}
+          <div 
+            className="fixed bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50"
+            style={{
+              left: `${contextMenu.x}px`,
+              top: `${contextMenu.y}px`,
+              minWidth: '180px'
+            }}
+          >
+            <button
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+              onClick={() => {
+                if (contextMenu.slidePosition && currentSlide) {
+                  handleTextBlockAdd(currentSlide.id, contextMenu.slidePosition)
+                  setContextMenu({ visible: false, x: 0, y: 0, slidePosition: null })
+                }
+              }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Text Block
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
