@@ -21,9 +21,13 @@ export default function Home() {
     const storedNickname = localStorage.getItem('userNickname')
     if (storedNickname) {
       setNickname(storedNickname)
+      fetchPresentations()
+    } else {
+      // Show nickname modal immediately if no nickname
+      setShowNicknameModal(true)
+      setActionType('browse') // New action type for browsing
+      setLoading(false)
     }
-    
-    fetchPresentations()
   }, [])
 
   const fetchPresentations = async () => {
@@ -97,18 +101,35 @@ export default function Home() {
       setShowCreateModal(true)
     } else if (actionType === 'join') {
       joinPresentation(selectedPresentationId)
+    } else if (actionType === 'browse') {
+      // Just entered nickname to browse - fetch presentations
+      fetchPresentations()
     }
   }
 
   const handleLogout = () => {
     setNickname('')
     localStorage.removeItem('userNickname')
+    setShowNicknameModal(true)
+    setActionType('browse')
+  }
+
+  // Show nickname modal if no nickname is set
+  if (!nickname && !showNicknameModal) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-xl">Setting up...</div>
+      </div>
+    )
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl">Loading presentations...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="text-xl">Loading presentations...</div>
+        </div>
       </div>
     )
   }
@@ -132,7 +153,7 @@ export default function Home() {
                     onClick={handleLogout}
                     className="text-sm text-red-600 hover:text-red-700 underline"
                   >
-                    Logout
+                    Change User
                   </button>
                 </div>
               )}
@@ -178,7 +199,12 @@ export default function Home() {
       {showNicknameModal && (
         <NicknameModal
           onSubmit={handleNicknameSubmit}
-          onClose={() => setShowNicknameModal(false)}
+          onClose={() => {
+            // Don't allow closing if no nickname is set (first time)
+            if (nickname) {
+              setShowNicknameModal(false)
+            }
+          }}
         />
       )}
 
