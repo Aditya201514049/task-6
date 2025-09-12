@@ -17,7 +17,7 @@ const presentationController = {
       const presentations = await Presentation.find()
         .sort({ lastActivity: -1 })
         .limit(50)
-        .select('id title createdBy createdAt lastActivity connectedUsers')
+        .select('id title createdBy createdAt lastActivity connectedUsers slides')
       
       // Add online user count to each presentation
       const presentationsWithUserCount = presentations.map(pres => ({
