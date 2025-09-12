@@ -11,7 +11,7 @@ export default function UserAccessManager({
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [newUserNickname, setNewUserNickname] = useState('')
-  const [newUserRole, setNewUserRole] = useState('viewer')
+  const [newUserRole, setNewUserRole] = useState('editor')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [copySuccess, setCopySuccess] = useState('')
@@ -23,7 +23,7 @@ export default function UserAccessManager({
   }
 
   // Generate invite link
-  const generateInviteLink = (role = 'viewer') => {
+  const generateInviteLink = (role = 'editor') => {
     const baseUrl = window.location.origin
     const inviteToken = btoa(`${presentation.id}:${role}:${Date.now()}`)
     return `${baseUrl}/presentation/${presentation.id}?invite=${inviteToken}&role=${role}`
@@ -83,7 +83,7 @@ export default function UserAccessManager({
       if (data.success) {
         onUserAdded(data.authorizedUser)
         setNewUserNickname('')
-        setNewUserRole('viewer')
+        setNewUserRole('editor')
         setError('')
       } else {
         setError(data.error || 'Failed to add user')
@@ -216,7 +216,6 @@ export default function UserAccessManager({
                     className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     disabled={isLoading}
                   >
-                    <option value="viewer">Viewer</option>
                     <option value="editor">Editor</option>
                   </select>
                   <button

@@ -631,6 +631,7 @@ export default function PresentationEditor() {
                       textBlock={block}
                       onUpdate={(updatedBlock) => handleTextBlockUpdate(currentSlide.id, updatedBlock)}
                       onDelete={() => handleTextBlockDelete(currentSlide.id, block.id)}
+                      onSelect={() => {}} // Add empty function to prevent error
                       canEdit={userRole !== 'Viewer'}
                     />
                   )
