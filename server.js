@@ -55,14 +55,70 @@ nextApp.prepare().then(() => {
   })
 
   // Socket.io connection handling
+  const presentationUsers = new Map() // Track users per presentation
+  
   io.on('connection', (socket) => {
     console.log('User connected:', socket.id)
 
     // Join presentation room
     socket.on('join-presentation', (data) => {
-      const { presentationId, nickname } = data
+      const { presentationId, nickname, role = 'Viewer' } = data
       socket.join(presentationId)
-      console.log(`User ${nickname} (${socket.id}) joined presentation: ${presentationId}`)
+      
+      // Store user info in socket
+      socket.presentationId = presentationId
+      socket.nickname = nickname
+      
+      // Add user to presentation users map
+      if (!presentationUsers.has(presentationId)) {
+        presentationUsers.set(presentationId, new Map())
+      }
+      
+      const presentationUserMap = presentationUsers.get(presentationId)
+      presentationUserMap.set(socket.id, {
+        nickname,
+        socketId: socket.id,
+        role: role, // Use the role from client
+        joinedAt: new Date()
+      })
+      
+      // Get current connected users for this presentation
+      const connectedUsers = Array.from(presentationUserMap.values())
+      
+      console.log(`User ${nickname} (${socket.id}) joined presentation: ${presentationId} as ${role}`)
+      console.log(`Connected users in ${presentationId}:`, connectedUsers.map(u => `${u.nickname} (${u.role})`))
+      
+      // Emit to all users in the presentation (including the one who just joined)
+      io.to(presentationId).emit('user-joined', {
+        user: { nickname, socketId: socket.id, role },
+        connectedUsers
+      })
+    })
+
+    // Handle user role updates
+    socket.on('update-user-role', (data) => {
+      const { presentationId, nickname, role } = data
+      
+      if (presentationUsers.has(presentationId)) {
+        const presentationUserMap = presentationUsers.get(presentationId)
+        const userEntry = Array.from(presentationUserMap.values()).find(u => u.nickname === nickname)
+        
+        if (userEntry) {
+          userEntry.role = role
+          const connectedUsers = Array.from(presentationUserMap.values())
+          
+          // Emit updated users list
+          io.to(presentationId).emit('users-updated', {
+            connectedUsers
+          })
+        }
+      }
+    })
+
+    // Leave presentation room
+    socket.on('leave-presentation', (data) => {
+      const { presentationId, nickname } = data
+      handleUserLeave(socket, presentationId, nickname)
     })
 
     // Handle real-time text updates
@@ -103,8 +159,30 @@ nextApp.prepare().then(() => {
     // Handle user disconnection
     socket.on('disconnect', (reason) => {
       console.log('User disconnected:', socket.id, 'Reason:', reason)
+      if (socket.presentationId) {
+        handleUserLeave(socket, socket.presentationId, socket.nickname)
+      }
     })
   })
+
+  const handleUserLeave = (socket, presentationId, nickname) => {
+    if (presentationUsers.has(presentationId)) {
+      const presentationUserMap = presentationUsers.get(presentationId)
+      presentationUserMap.delete(socket.id)
+      
+      // Get current connected users for this presentation
+      const connectedUsers = Array.from(presentationUserMap.values())
+      
+      console.log(`User ${nickname} (${socket.id}) left presentation: ${presentationId}`)
+      console.log(`Connected users in ${presentationId}:`, connectedUsers.map(u => u.nickname))
+      
+      // Emit to all users in the presentation
+      io.to(presentationId).emit('user-left', {
+        user: { nickname, socketId: socket.id },
+        connectedUsers
+      })
+    }
+  }
 
   // Connect to database and start server
   connectDB().then(() => {

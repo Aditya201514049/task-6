@@ -39,7 +39,7 @@ export default function PresentationEditor() {
     onSlideAdd,
     onSlideDelete,
     onPresentationUpdate
-  } = useSocket(presentationId, nickname)
+  } = useSocket(presentationId, nickname, userRole)
 
   // Get current user info
   const authorizedUser = presentation?.authorizedUsers?.find(user => user.nickname === nickname)
@@ -497,52 +497,14 @@ export default function PresentationEditor() {
 
   const currentSlide = presentation?.slides?.find(slide => slide.id === selectedSlideId)
 
-  // Combine authorized users and connected users for display
-  const getAllUsersWithAccess = () => {
-    if (!presentation) return []
-    
-    const users = new Map()
-    
-    // Add creator
-    users.set(presentation.createdBy, {
-      nickname: presentation.createdBy,
-      role: 'Creator',
-      isOnline: socketConnectedUsers.some(u => u.nickname === presentation.createdBy),
-      isAuthorized: true
-    })
-    
-    // Add authorized users
-    presentation.authorizedUsers?.forEach(authUser => {
-      const isOnline = socketConnectedUsers.some(u => u.nickname === authUser.nickname)
-      users.set(authUser.nickname, {
-        nickname: authUser.nickname,
-        role: authUser.role === 'editor' ? 'Editor' : 'Viewer',
-        isOnline,
-        isAuthorized: true
-      })
-    })
-    
-    // Add connected users (including anonymous users with public access)
-    socketConnectedUsers.forEach(connUser => {
-      if (!users.has(connUser.nickname)) {
-        // This is an anonymous user with public access
-        users.set(connUser.nickname, {
-          nickname: connUser.nickname,
-          role: connUser.role || 'Viewer',
-          isOnline: true,
-          isAuthorized: false
-        })
-      } else {
-        // Update online status for existing user
-        const existingUser = users.get(connUser.nickname)
-        existingUser.isOnline = true
-      }
-    })
-    
-    return Array.from(users.values())
-  }
-
-  const displayConnectedUsers = getAllUsersWithAccess()
+  // Show only currently connected users (live presence)
+  const displayConnectedUsers = socketConnectedUsers || []
+  
+  // Debug logging
+  console.log('Debug - socketConnectedUsers:', socketConnectedUsers)
+  console.log('Debug - isConnected:', isConnected)
+  console.log('Debug - nickname:', nickname)
+  console.log('Debug - presentationId:', presentationId)
 
   if (loading) {
     return (

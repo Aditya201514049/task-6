@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 
-export default function useSocket(presentationId, nickname) {
+export default function useSocket(presentationId, nickname, userRole = 'Viewer') {
   const socketRef = useRef(null)
   const [isConnected, setIsConnected] = useState(false)
   const [connectedUsers, setConnectedUsers] = useState([])
@@ -33,8 +33,12 @@ export default function useSocket(presentationId, nickname) {
       setIsConnected(true)
       setError(null)
       
-      // Join presentation room
-      socket.emit('join-presentation', { presentationId, nickname })
+      // Join presentation room with role
+      socket.emit('join-presentation', { 
+        presentationId, 
+        nickname,
+        role: userRole 
+      })
     })
 
     socket.on('disconnect', (reason) => {
@@ -94,7 +98,7 @@ export default function useSocket(presentationId, nickname) {
         socket.disconnect()
       }
     }
-  }, [presentationId, nickname])
+  }, [presentationId, nickname, userRole])
 
   // Emit text block update
   const emitTextBlockUpdate = (slideId, blockId, updates) => {
