@@ -13,6 +13,8 @@ export default function DraggableWrapper({
   const [position, setPosition] = useState(defaultPosition)
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [mouseStart, setMouseStart] = useState({ x: 0, y: 0 })
+  const [hasMoved, setHasMoved] = useState(false)
   const elementRef = useRef(null)
 
   useEffect(() => {
@@ -22,20 +24,28 @@ export default function DraggableWrapper({
   const handleMouseDown = (e) => {
     if (disabled) return
     
-    e.preventDefault()
-    setIsDragging(true)
-    
+    // Don't prevent default immediately - let clicks through
     const rect = elementRef.current.getBoundingClientRect()
+    setMouseStart({ x: e.clientX, y: e.clientY })
     setDragStart({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top
     })
+    setHasMoved(false)
     
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
   }
 
   const handleMouseMove = (e) => {
+    const moveDistance = Math.abs(e.clientX - mouseStart.x) + Math.abs(e.clientY - mouseStart.y)
+    
+    // Only start dragging if mouse has moved more than 5 pixels
+    if (moveDistance > 5 && !isDragging) {
+      setIsDragging(true)
+      setHasMoved(true)
+    }
+    
     if (!isDragging) return
     
     const parent = elementRef.current.parentElement
@@ -63,13 +73,17 @@ export default function DraggableWrapper({
   }
 
   const handleMouseUp = (e) => {
-    if (!isDragging) return
-    
-    setIsDragging(false)
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mouseup', handleMouseUp)
     
-    onStop(e, position)
+    if (isDragging) {
+      setIsDragging(false)
+      onStop(e, position)
+    }
+    
+    // Reset states
+    setIsDragging(false)
+    setHasMoved(false)
   }
 
   // Touch events for mobile support
@@ -125,7 +139,7 @@ export default function DraggableWrapper({
         left: `${position.x}px`,
         top: `${position.y}px`,
         cursor: disabled ? 'default' : (isDragging ? 'grabbing' : 'grab'),
-        userSelect: 'none',
+        userSelect: isDragging ? 'none' : 'auto',
         touchAction: 'none'
       }}
       onMouseDown={handleMouseDown}
