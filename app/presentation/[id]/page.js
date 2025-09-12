@@ -209,24 +209,29 @@ export default function PresentationEditor() {
     setSelectedSlideId(slideId)
   }
 
-  const handleTextBlockUpdate = async (slideId, blockId, updates) => {
+  const handleTextBlockUpdate = async (slideId, updatedBlock) => {
+    console.log('handleTextBlockUpdate called with:', { slideId, updatedBlock })
+    
     try {
       // Find the slide and update the text block
       const updatedSlides = presentation.slides.map(slide => {
         if (slide.id === slideId) {
           const updatedTextBlocks = slide.textBlocks.map(block => 
-            block.id === blockId ? { ...block, ...updates } : block
+            block.id === updatedBlock.id ? updatedBlock : block
           )
+          console.log('Updated textBlocks for slide:', updatedTextBlocks)
           return { ...slide, textBlocks: updatedTextBlocks }
         }
         return slide
       })
 
+      console.log('About to update presentation state with slides:', updatedSlides)
+      
       // Update local state immediately for responsiveness
       setPresentation(prev => ({ ...prev, slides: updatedSlides }))
 
       // Emit real-time update
-      emitTextBlockUpdate(slideId, blockId, updates)
+      emitTextBlockUpdate(slideId, updatedBlock.id, updatedBlock)
 
       // Send update to backend
       const response = await fetch(`/api/presentations/${presentationId}`, {
@@ -247,6 +252,8 @@ export default function PresentationEditor() {
       if (!data.success) {
         throw new Error(data.error || 'Failed to update presentation')
       }
+
+      console.log('Backend update successful')
     } catch (err) {
       console.error('Error updating text block:', err)
       // Revert local changes on error
@@ -515,17 +522,17 @@ export default function PresentationEditor() {
                     <MarkdownTextBlock
                       key={block.id}
                       block={block}
-                      onUpdate={(updates) => handleTextBlockUpdate(currentSlide.id, block.id, updates)}
+                      onUpdate={(updatedBlock) => handleTextBlockUpdate(currentSlide.id, updatedBlock)}
                       onDelete={() => handleTextBlockDelete(currentSlide.id, block.id)}
                       disabled={userRole === 'Viewer'}
                     />
                   ) : (
                     <TextBlock
                       key={block.id}
-                      block={block}
-                      onUpdate={(updates) => handleTextBlockUpdate(currentSlide.id, block.id, updates)}
+                      textBlock={block}
+                      onUpdate={(updatedBlock) => handleTextBlockUpdate(currentSlide.id, updatedBlock)}
                       onDelete={() => handleTextBlockDelete(currentSlide.id, block.id)}
-                      disabled={userRole === 'Viewer'}
+                      canEdit={userRole !== 'Viewer'}
                     />
                   )
                 })}

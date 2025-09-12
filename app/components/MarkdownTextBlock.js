@@ -49,7 +49,11 @@ export default function MarkdownTextBlock({
   }
 
   const handleSave = () => {
-    onUpdate(block.id, { content: editContent })
+    const updatedBlock = {
+      ...block,
+      content: editContent
+    }
+    onUpdate(updatedBlock)
     setIsEditing(false)
   }
 
@@ -69,7 +73,12 @@ export default function MarkdownTextBlock({
   }
 
   const handleDragStop = (e, data) => {
-    onUpdate(block.id, { x: data.x, y: data.y })
+    const updatedBlock = {
+      ...block,
+      x: data.x,
+      y: data.y
+    }
+    onUpdate(updatedBlock)
   }
 
   const handleDelete = () => {

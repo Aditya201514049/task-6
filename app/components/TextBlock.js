@@ -16,6 +16,10 @@ export default function TextBlock({
   const textareaRef = useRef(null)
 
   useEffect(() => {
+    setContent(textBlock.content || 'Click to edit text')
+  }, [textBlock.content])
+
+  useEffect(() => {
     if (isEditing && textareaRef.current) {
       textareaRef.current.focus()
       textareaRef.current.select()
@@ -33,11 +37,17 @@ export default function TextBlock({
   }
 
   const handleTextBlur = () => {
+    console.log('TextBlock handleTextBlur called')
+    console.log('Current content:', content)
+    console.log('Original textBlock:', textBlock)
+    
     setIsEditing(false)
-    onUpdate({
+    const updatedBlock = {
       ...textBlock,
       content: content
-    })
+    }
+    console.log('Calling onUpdate with:', updatedBlock)
+    onUpdate(updatedBlock)
   }
 
   const handleKeyDown = (e) => {
