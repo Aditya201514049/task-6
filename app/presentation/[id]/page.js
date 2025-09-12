@@ -24,6 +24,9 @@ export default function PresentationEditor() {
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, slidePosition: null })
   const [editingPresentationTitle, setEditingPresentationTitle] = useState(false)
   const [editingTitle, setEditingTitle] = useState('')
+  const [isMobile, setIsMobile] = useState(false)
+  const [showMobileMenu, setShowMobileMenu] = useState(false)
+  const [activePanel, setActivePanel] = useState('canvas') // 'slides', 'canvas', 'users'
 
   // Initialize WebSocket connection - but wait for role to be determined
   const {
@@ -546,53 +549,69 @@ export default function PresentationEditor() {
   return (
     <div className="h-screen flex flex-col bg-gray-100">
       {/* Top Toolbar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
         <div className="flex items-center justify-between">
-          <div>
-            {editingPresentationTitle ? (
-              <input
-                type="text"
-                value={editingTitle}
-                onChange={(e) => setEditingTitle(e.target.value)}
-                className="text-xl font-semibold text-gray-800 w-64"
-                autoFocus
-                onBlur={() => {
-                  setEditingPresentationTitle(false)
-                  if (editingTitle !== presentation.title) {
-                    // Update presentation title
-                    setPresentation(prev => ({ ...prev, title: editingTitle }))
-                    // Send update to backend
-                    fetch(`/api/presentations/${presentationId}`, {
-                      method: 'PUT',
-                      headers: {
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify({
-                        title: editingTitle
-                      }),
-                    })
-                  }
-                }}
-              />
-            ) : (
-              <h1
-                className={`text-xl font-semibold text-gray-800 ${(userRole === 'creator' || userRole === 'editor') ? 'cursor-pointer hover:bg-gray-50 px-2 py-1 rounded' : ''}`}
-                onClick={() => {
-                  if (userRole === 'creator' || userRole === 'editor') {
-                    setEditingPresentationTitle(true)
-                    setEditingTitle(presentation.title)
-                  }
-                }}
-                title={(userRole === 'creator' || userRole === 'editor') ? 'Click to edit title' : ''}
-              >
-                {presentation.title}
-              </h1>
-            )}
-            <p className="text-sm text-gray-600">
-              Created by {presentation.createdBy} • {presentation.slides?.length || 0} slides
-            </p>
+          <div className="flex items-center space-x-3">
+            {/* Back Button */}
+            <button
+              onClick={() => window.location.href = '/'}
+              className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              title="Back to presentations"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+
+            {/* Title Section */}
+            <div className="flex-1 min-w-0">
+              {editingPresentationTitle ? (
+                <input
+                  type="text"
+                  value={editingTitle}
+                  onChange={(e) => setEditingTitle(e.target.value)}
+                  className="text-lg sm:text-xl font-semibold text-gray-800 w-full max-w-xs sm:max-w-md"
+                  autoFocus
+                  onBlur={() => {
+                    setEditingPresentationTitle(false)
+                    if (editingTitle !== presentation.title) {
+                      // Update presentation title
+                      setPresentation(prev => ({ ...prev, title: editingTitle }))
+                      // Send update to backend
+                      fetch(`/api/presentations/${presentationId}`, {
+                        method: 'PUT',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          title: editingTitle
+                        }),
+                      })
+                    }
+                  }}
+                />
+              ) : (
+                <h1
+                  className={`text-lg sm:text-xl font-semibold text-gray-800 truncate ${(userRole === 'creator' || userRole === 'editor') ? 'cursor-pointer hover:bg-gray-50 px-2 py-1 rounded' : ''}`}
+                  onClick={() => {
+                    if (userRole === 'creator' || userRole === 'editor') {
+                      setEditingPresentationTitle(true)
+                      setEditingTitle(presentation.title)
+                    }
+                  }}
+                  title={(userRole === 'creator' || userRole === 'editor') ? 'Click to edit title' : ''}
+                >
+                  {presentation.title}
+                </h1>
+              )}
+              <p className="text-xs sm:text-sm text-gray-600 truncate">
+                Created by {presentation.createdBy} • {presentation.slides?.length || 0} slides
+              </p>
+            </div>
           </div>
-          <div className="flex items-center space-x-4">
+          
+          {/* Desktop Controls */}
+          <div className="hidden md:flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
               <span className="text-sm text-gray-600">
@@ -600,6 +619,11 @@ export default function PresentationEditor() {
               </span>
             </div>
             
+            {/* User Info */}
+            <div className="text-sm text-gray-600">
+              <span className="font-medium">{nickname}</span> ({userRole})
+            </div>
+
             {/* Markdown Toggle */}
             {userRole !== 'viewer' && (
               <div className="flex items-center space-x-2">
@@ -607,7 +631,7 @@ export default function PresentationEditor() {
                 <button
                   onClick={() => setUseMarkdown(!useMarkdown)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    useMarkdown ? 'bg-blue-600' : 'bg-gray-300'
+                    useMarkdown ? 'bg-blue-600' : 'bg-gray-200'
                   }`}
                 >
                   <span
@@ -616,36 +640,113 @@ export default function PresentationEditor() {
                     }`}
                   />
                 </button>
-                <span className="text-xs text-gray-500">
-                  {useMarkdown ? 'Rich text' : 'Plain text'}
-                </span>
               </div>
             )}
-            
-            <div className="text-sm text-gray-600">
-              Role: <span className="font-medium">{userRole}</span>
-            </div>
-            <div className="text-sm text-gray-600">
-              User: <span className="font-medium">{nickname}</span>
-            </div>
+
+            {/* Present Mode Button */}
             <button
               onClick={() => window.open(`/presentation/${presentationId}/present`, '_blank')}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors duration-200 flex items-center space-x-2"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h1m4 0h1m6-10V7a3 3 0 01-3 3H6a3 3 0 01-3-3V4a3 3 0 013-3h8a3 3 0 013 3v3z" />
-              </svg>
-              <span>Present</span>
+              Present
             </button>
-            <UserAccessManager 
-              presentation={presentation}
-              currentUserNickname={nickname}
-              onUserAdded={handleUserAdded}
-              onUserRemoved={handleUserRemoved}
-              onSettingsUpdated={handleSettingsUpdated}
-            />
+
+            {/* User Access Manager */}
+            {isCreator && (
+              <UserAccessManager 
+                presentation={presentation}
+                currentUserNickname={nickname}
+                onUserAdded={handleUserAdded}
+                onUserRemoved={handleUserRemoved}
+                onSettingsUpdated={handleSettingsUpdated}
+              />
+            )}
+          </div>
+
+          {/* Mobile Menu Button */}
+          <div className="md:hidden">
+            <button
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+              className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
           </div>
         </div>
+
+        {/* Mobile Menu */}
+        {showMobileMenu && (
+          <div className="mt-4 pt-4 border-t border-gray-200 md:hidden">
+            <div className="space-y-4">
+              {/* User Info */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <div className="font-medium text-gray-800">{nickname}</div>
+                  <div className="text-sm text-gray-600">Role: {userRole}</div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <span className="text-sm text-gray-600">
+                    {isConnected ? 'Connected' : 'Disconnected'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Create New Presentation */}
+              <button
+                onClick={() => window.location.href = '/'}
+                className="w-full flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Create New Presentation</span>
+              </button>
+
+              {/* Markdown Toggle */}
+              {userRole !== 'viewer' && (
+                <div className="flex items-center justify-between">
+                  <label className="text-sm text-gray-600">Markdown:</label>
+                  <button
+                    onClick={() => setUseMarkdown(!useMarkdown)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      useMarkdown ? 'bg-blue-600' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        useMarkdown ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              )}
+
+              {/* Present Mode Button */}
+              <button
+                onClick={() => window.open(`/presentation/${presentationId}/present`, '_blank')}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Present
+              </button>
+
+              {/* User Access Manager */}
+              {isCreator && (
+                <div className="pt-2">
+                  <UserAccessManager 
+                    presentation={presentation}
+                    currentUserNickname={nickname}
+                    onUserAdded={handleUserAdded}
+                    onUserRemoved={handleUserRemoved}
+                    onSettingsUpdated={handleSettingsUpdated}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Content */}

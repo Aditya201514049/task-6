@@ -9,10 +9,12 @@ export default function TextBlock({
   onDelete, 
   isSelected, 
   onSelect,
-  canEdit = true 
+  canEdit = true,
+  isMobile = false
 }) {
   const [isEditing, setIsEditing] = useState(false)
   const [content, setContent] = useState(textBlock.content || 'Click to edit text')
+  const [touchStartTime, setTouchStartTime] = useState(0)
   const textareaRef = useRef(null)
 
   useEffect(() => {
@@ -32,21 +34,28 @@ export default function TextBlock({
     }
   }
 
+  // Mobile touch handlers
+  const handleTouchStart = () => {
+    setTouchStartTime(Date.now())
+  }
+
+  const handleTouchEnd = () => {
+    const touchDuration = Date.now() - touchStartTime
+    if (touchDuration > 500 && canEdit) { // Long press (500ms)
+      setIsEditing(true)
+    }
+  }
+
   const handleTextChange = (e) => {
     setContent(e.target.value)
   }
 
   const handleTextBlur = () => {
-    console.log('TextBlock handleTextBlur called')
-    console.log('Current content:', content)
-    console.log('Original textBlock:', textBlock)
-    
     setIsEditing(false)
     const updatedBlock = {
       ...textBlock,
       content: content
     }
-    console.log('Calling onUpdate with:', updatedBlock)
     onUpdate(updatedBlock)
   }
 
@@ -76,30 +85,34 @@ export default function TextBlock({
 
   return (
     <DraggableWrapper
-      disabled={isEditing}
+      disabled={isEditing || isMobile}
       defaultPosition={{ x: textBlock.x, y: textBlock.y }}
       onStop={handleDragStop}
       bounds="parent"
     >
       <div
-        className={`absolute cursor-move group ${
+        className={`absolute ${isMobile ? 'cursor-pointer' : 'cursor-move'} group ${
           isSelected ? 'ring-2 ring-blue-500' : ''
         }`}
         style={{
-          width: textBlock.width || 200,
-          height: textBlock.height || 50,
+          width: textBlock.width || (isMobile ? 150 : 200),
+          height: textBlock.height || (isMobile ? 40 : 50),
           zIndex: textBlock.zIndex || 1
         }}
         onClick={() => onSelect(textBlock.id)}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
-        {/* Drag Handle */}
-        <div className="drag-handle absolute inset-0" />
+        {/* Drag Handle - hidden on mobile */}
+        {!isMobile && <div className="drag-handle absolute inset-0" />}
         
         {/* Delete Button */}
         {isSelected && canEdit && (
           <button
             onClick={handleDelete}
-            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+            className={`absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition-opacity flex items-center justify-center ${
+              isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            }`}
             title="Delete text block"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -116,9 +129,11 @@ export default function TextBlock({
             onChange={handleTextChange}
             onBlur={handleTextBlur}
             onKeyDown={handleKeyDown}
-            className="w-full h-full resize-none border-2 border-blue-500 rounded px-2 py-1 text-sm focus:outline-none"
+            className={`w-full h-full resize-none border-2 border-blue-500 rounded px-2 py-1 focus:outline-none ${
+              isMobile ? 'text-sm' : 'text-sm'
+            }`}
             style={{
-              fontSize: textBlock.fontSize || 16,
+              fontSize: textBlock.fontSize || (isMobile ? 14 : 16),
               fontWeight: textBlock.fontWeight || 'normal',
               color: textBlock.color || '#000000',
               backgroundColor: textBlock.backgroundColor || 'transparent',
@@ -128,9 +143,11 @@ export default function TextBlock({
         ) : (
           <div
             onDoubleClick={handleDoubleClick}
-            className="w-full h-full px-2 py-1 border border-transparent hover:border-gray-300 rounded cursor-text"
+            className={`w-full h-full px-2 py-1 border border-transparent hover:border-gray-300 rounded ${
+              isMobile ? 'cursor-pointer' : 'cursor-text'
+            }`}
             style={{
-              fontSize: textBlock.fontSize || 16,
+              fontSize: textBlock.fontSize || (isMobile ? 14 : 16),
               fontWeight: textBlock.fontWeight || 'normal',
               color: textBlock.color || '#000000',
               backgroundColor: textBlock.backgroundColor || 'transparent',
@@ -139,12 +156,12 @@ export default function TextBlock({
               overflow: 'hidden'
             }}
           >
-            {content || 'Click to edit text'}
+            {content || (isMobile ? 'Long press to edit' : 'Click to edit text')}
           </div>
         )}
 
-        {/* Resize Handles */}
-        {isSelected && canEdit && !isEditing && (
+        {/* Resize Handles - hidden on mobile */}
+        {isSelected && canEdit && !isEditing && !isMobile && (
           <>
             <div className="absolute bottom-0 right-0 w-3 h-3 bg-blue-500 cursor-se-resize" />
             <div className="absolute bottom-0 left-0 w-3 h-3 bg-blue-500 cursor-sw-resize" />
