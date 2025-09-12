@@ -37,8 +37,20 @@ export default function PresentationEditor() {
 
   // Get current user info
   const isCreator = presentation?.createdBy === nickname
+  
+  // Check authorized users for role
+  const authorizedUser = presentation?.authorizedUsers?.find(user => user.nickname === nickname)
   const currentUser = presentation?.connectedUsers?.find(user => user.nickname === nickname)
-  const userRole = isCreator ? 'Creator' : (currentUser?.role || 'Viewer')
+  
+  // Determine user role: Creator > Authorized User > Connected User > Default Viewer
+  let userRole = 'Viewer'
+  if (isCreator) {
+    userRole = 'Creator'
+  } else if (authorizedUser) {
+    userRole = authorizedUser.role === 'editor' ? 'Editor' : 'Viewer'
+  } else if (currentUser) {
+    userRole = currentUser.role === 'editor' ? 'Editor' : 'Viewer'
+  }
 
   useEffect(() => {
     // Get nickname from localStorage
