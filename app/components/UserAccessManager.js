@@ -333,16 +333,6 @@ export default function UserAccessManager({
                 </div>
               </div>
             </div>
-
-            {/* Footer */}
-            <div className="flex justify-end p-6 border-t bg-gray-50 flex-shrink-0">
-              <button
-                onClick={() => setIsOpen(false)}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-              >
-                Close
-              </button>
-            </div>
           </div>
         </div>
       )}
