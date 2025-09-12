@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import TextBlock from '../../components/TextBlock'
 import MarkdownTextBlock from '../../components/MarkdownTextBlock'
 import SlidePanel from '../../components/SlidePanel'
+import UserAccessManager from '../../components/UserAccessManager'
 import useSocket from '../../hooks/useSocket'
 
 export default function PresentationEditor() {
@@ -367,6 +368,27 @@ export default function PresentationEditor() {
     }
   }
 
+  const handleUserAdded = (newUser) => {
+    setPresentation(prev => ({
+      ...prev,
+      authorizedUsers: [...(prev.authorizedUsers || []), newUser]
+    }))
+  }
+
+  const handleUserRemoved = (nickname) => {
+    setPresentation(prev => ({
+      ...prev,
+      authorizedUsers: (prev.authorizedUsers || []).filter(user => user.nickname !== nickname)
+    }))
+  }
+
+  const handleSettingsUpdated = (newSettings) => {
+    setPresentation(prev => ({
+      ...prev,
+      settings: newSettings
+    }))
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -462,6 +484,13 @@ export default function PresentationEditor() {
               </svg>
               <span>Present</span>
             </button>
+            <UserAccessManager 
+              presentation={presentation}
+              currentUserNickname={nickname}
+              onUserAdded={handleUserAdded}
+              onUserRemoved={handleUserRemoved}
+              onSettingsUpdated={handleSettingsUpdated}
+            />
           </div>
         </div>
       </div>

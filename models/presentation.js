@@ -41,6 +41,14 @@ const userSchema = new mongoose.Schema({
   joinedAt: { type: Date, default: Date.now }
 })
 
+// Authorized User Schema for persistent access control
+const authorizedUserSchema = new mongoose.Schema({
+  nickname: { type: String, required: true },
+  role: { type: String, enum: ['editor', 'viewer'], required: true },
+  addedBy: { type: String, required: true },
+  addedAt: { type: Date, default: Date.now }
+})
+
 // Main Presentation Schema
 const presentationSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
@@ -49,6 +57,7 @@ const presentationSchema = new mongoose.Schema({
   createdBy: { type: String, required: true }, // nickname of creator
   slides: [slideSchema],
   connectedUsers: [userSchema],
+  authorizedUsers: [authorizedUserSchema], // Persistent user access control
   settings: {
     allowAnonymousEdit: { type: Boolean, default: true },
     maxUsers: { type: Number, default: 50 },
@@ -109,6 +118,55 @@ presentationSchema.methods.updateUserRole = function(socketId, newRole) {
     user.role = newRole
   }
   return user
+}
+
+// Methods for authorized user management
+presentationSchema.methods.addAuthorizedUser = function(nickname, role, addedBy) {
+  // Check if user already exists
+  const existingUser = this.authorizedUsers.find(user => user.nickname === nickname)
+  if (existingUser) {
+    return null // User already exists
+  }
+  
+  const newUser = {
+    nickname,
+    role,
+    addedBy,
+    addedAt: new Date()
+  }
+  
+  this.authorizedUsers.push(newUser)
+  return newUser
+}
+
+presentationSchema.methods.removeAuthorizedUser = function(nickname) {
+  const initialLength = this.authorizedUsers.length
+  this.authorizedUsers = this.authorizedUsers.filter(user => user.nickname !== nickname)
+  return this.authorizedUsers.length < initialLength // Returns true if user was removed
+}
+
+presentationSchema.methods.getUserRole = function(nickname) {
+  // Check if user is creator
+  if (this.createdBy === nickname) {
+    return 'creator'
+  }
+  
+  // Check authorized users
+  const authorizedUser = this.authorizedUsers.find(user => user.nickname === nickname)
+  if (authorizedUser) {
+    return authorizedUser.role
+  }
+  
+  // Check if presentation allows anonymous access
+  if (this.settings.isPublic) {
+    return this.settings.allowAnonymousEdit ? 'editor' : 'viewer'
+  }
+  
+  return null // No access
+}
+
+presentationSchema.methods.hasAccess = function(nickname) {
+  return this.getUserRole(nickname) !== null
 }
 
 module.exports = mongoose.model('Presentation', presentationSchema)
