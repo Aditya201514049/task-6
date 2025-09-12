@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import Draggable from 'react-draggable'
+import DraggableWrapper from './DraggableWrapper'
 
-export default function TextBlock({ 
+export default function TextBlock({
   textBlock, 
   onUpdate, 
   onDelete, 
@@ -51,7 +51,7 @@ export default function TextBlock({
     }
   }
 
-  const handleDrag = (e, data) => {
+  const handleDragStop = (e, data) => {
     onUpdate({
       ...textBlock,
       x: data.x,
@@ -65,11 +65,11 @@ export default function TextBlock({
   }
 
   return (
-    <Draggable
-      position={{ x: textBlock.x, y: textBlock.y }}
-      onStop={handleDrag}
+    <DraggableWrapper
       disabled={isEditing}
-      handle=".drag-handle"
+      defaultPosition={{ x: textBlock.x, y: textBlock.y }}
+      onStop={handleDragStop}
+      bounds="parent"
     >
       <div
         className={`absolute cursor-move group ${
@@ -140,6 +140,6 @@ export default function TextBlock({
           </>
         )}
       </div>
-    </Draggable>
+    </DraggableWrapper>
   )
 }

@@ -36,7 +36,7 @@ export default function PresentationEditor() {
   // Get current user info
   const isCreator = presentation?.createdBy === nickname
   const currentUser = presentation?.connectedUsers?.find(user => user.nickname === nickname)
-  const userRole = currentUser?.role || 'Viewer'
+  const userRole = isCreator ? 'Creator' : (currentUser?.role || 'Viewer')
 
   useEffect(() => {
     // Get nickname from localStorage
