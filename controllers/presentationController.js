@@ -282,6 +282,68 @@ const presentationController = {
         error: 'Failed to add slide' 
       })
     }
+  },
+
+  // Delete slide from presentation
+  deleteSlide: async (req, res) => {
+    try {
+      const { id, slideId } = req.params
+      const { createdBy } = req.body
+      
+      const presentation = await Presentation.findOne({ id })
+      
+      if (!presentation) {
+        return res.status(404).json({ 
+          success: false, 
+          error: 'Presentation not found' 
+        })
+      }
+      
+      // Check if user is creator or has editor permissions
+      const isCreator = presentation.createdBy === createdBy
+      const authorizedUser = presentation.authorizedUsers?.find(user => user.nickname === createdBy)
+      const isEditor = authorizedUser?.role === 'editor'
+      
+      if (!isCreator && !isEditor) {
+        return res.status(403).json({ 
+          success: false, 
+          error: 'Only creators and editors can delete slides' 
+        })
+      }
+
+      // Prevent deleting the last slide
+      if (presentation.slides.length <= 1) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Cannot delete the last slide' 
+        })
+      }
+      
+      // Find and remove the slide
+      const slideIndex = presentation.slides.findIndex(slide => slide.id === slideId)
+      if (slideIndex === -1) {
+        return res.status(404).json({ 
+          success: false, 
+          error: 'Slide not found' 
+        })
+      }
+      
+      presentation.slides.splice(slideIndex, 1)
+      presentation.lastActivity = new Date()
+      
+      await presentation.save()
+      
+      res.json({ 
+        success: true, 
+        message: 'Slide deleted successfully'
+      })
+    } catch (error) {
+      console.error('Error deleting slide:', error)
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to delete slide' 
+      })
+    }
   }
 }
 

@@ -16,7 +16,13 @@ export default function useSocket(presentationId, nickname) {
     socketRef.current = io('/', {
       transports: ['websocket', 'polling'],
       upgrade: true,
-      rememberUpgrade: true
+      rememberUpgrade: true,
+      timeout: 20000,
+      forceNew: false,
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5,
+      maxReconnectionAttempts: 5
     })
 
     const socket = socketRef.current
@@ -125,6 +131,17 @@ export default function useSocket(presentationId, nickname) {
     }
   }
 
+  // Emit slide delete
+  const emitSlideDelete = (slideId) => {
+    if (socketRef.current && isConnected) {
+      socketRef.current.emit('slide-delete', {
+        presentationId,
+        slideId,
+        deletedBy: nickname
+      })
+    }
+  }
+
   // Emit cursor position
   const emitCursorPosition = (x, y, slideId) => {
     if (socketRef.current && isConnected) {
@@ -167,6 +184,13 @@ export default function useSocket(presentationId, nickname) {
     }
   }
 
+  const onSlideDelete = (callback) => {
+    if (socketRef.current) {
+      socketRef.current.on('slide-deleted', callback)
+      return () => socketRef.current.off('slide-deleted', callback)
+    }
+  }
+
   const onCursorMove = (callback) => {
     if (socketRef.current) {
       socketRef.current.on('cursor-moved', callback)
@@ -191,12 +215,14 @@ export default function useSocket(presentationId, nickname) {
     emitTextBlockAdd,
     emitTextBlockDelete,
     emitSlideAdd,
+    emitSlideDelete,
     emitCursorPosition,
     // Subscribe functions
     onTextBlockUpdate,
     onTextBlockAdd,
     onTextBlockDelete,
     onSlideAdd,
+    onSlideDelete,
     onCursorMove,
     onPresentationUpdate
   }

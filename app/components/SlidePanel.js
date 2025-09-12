@@ -7,6 +7,7 @@ export default function SlidePanel({
   selectedSlideId, 
   onSlideSelect, 
   onAddSlide, 
+  onDeleteSlide,
   userRole, 
   isCreator 
 }) {
@@ -20,6 +21,25 @@ export default function SlidePanel({
       await onAddSlide()
     } finally {
       setIsAddingSlide(false)
+    }
+  }
+
+  const handleDeleteSlide = async (slideId, e) => {
+    e.stopPropagation() // Prevent slide selection when delete button is clicked
+    
+    if (slides.length <= 1) {
+      alert('Cannot delete the last slide')
+      return
+    }
+    
+    const confirmed = window.confirm('Are you sure you want to delete this slide? This action cannot be undone.')
+    if (!confirmed) return
+    
+    try {
+      await onDeleteSlide(slideId)
+    } catch (error) {
+      console.error('Error deleting slide:', error)
+      alert('Failed to delete slide: ' + error.message)
     }
   }
 
@@ -78,6 +98,15 @@ export default function SlidePanel({
               <div className="absolute top-1 left-1 bg-gray-800 text-white text-xs px-1 rounded">
                 {index + 1}
               </div>
+              {/* Delete button */}
+              {(isCreator || userRole === 'Editor') && (
+                <button
+                  onClick={(e) => handleDeleteSlide(slide.id, e)}
+                  className="absolute top-1 right-1 bg-red-600 text-white text-xs px-1 rounded hover:bg-red-700"
+                >
+                  Delete
+                </button>
+              )}
             </div>
 
             {/* Slide Title */}

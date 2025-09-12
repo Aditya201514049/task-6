@@ -24,14 +24,17 @@ export default function PresentationEditor() {
   const {
     isConnected,
     connectedUsers: socketConnectedUsers,
+    error: socketError,
     emitTextBlockUpdate,
     emitTextBlockAdd,
     emitTextBlockDelete,
     emitSlideAdd,
+    emitSlideDelete,
     onTextBlockUpdate,
     onTextBlockAdd,
     onTextBlockDelete,
     onSlideAdd,
+    onSlideDelete,
     onPresentationUpdate
   } = useSocket(presentationId, nickname)
 
@@ -136,6 +139,18 @@ export default function PresentationEditor() {
       }
     })
 
+    const unsubscribeSlideDelete = onSlideDelete?.((data) => {
+      if (data.deletedBy !== nickname) {
+        setPresentation(prev => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            slides: prev.slides.filter(slide => slide.id !== data.slideId)
+          }
+        })
+      }
+    })
+
     const unsubscribePresentationUpdate = onPresentationUpdate?.((data) => {
       // Refresh presentation data when major updates occur
       fetchPresentation()
@@ -146,9 +161,10 @@ export default function PresentationEditor() {
       unsubscribeTextBlockAdd?.()
       unsubscribeTextBlockDelete?.()
       unsubscribeSlideAdd?.()
+      unsubscribeSlideDelete?.()
       unsubscribePresentationUpdate?.()
     }
-  }, [nickname, presentationId, onTextBlockUpdate, onTextBlockAdd, onTextBlockDelete, onSlideAdd, onPresentationUpdate])
+  }, [nickname, presentationId, onTextBlockUpdate, onTextBlockAdd, onTextBlockDelete, onSlideAdd, onSlideDelete, onPresentationUpdate])
 
   const fetchPresentation = async () => {
     try {
@@ -220,6 +236,47 @@ export default function PresentationEditor() {
 
   const handleSlideSelect = (slideId) => {
     setSelectedSlideId(slideId)
+  }
+
+  const handleDeleteSlide = async (slideId) => {
+    try {
+      const response = await fetch(`/api/presentations/${presentationId}/slides/${slideId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          createdBy: nickname
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}: Failed to delete slide`)
+      }
+      
+      if (data.success) {
+        // Emit real-time update
+        emitSlideDelete(slideId)
+        
+        // Refresh presentation data
+        await fetchPresentation()
+        
+        // If deleted slide was selected, select the first slide
+        if (selectedSlideId === slideId) {
+          const remainingSlides = presentation.slides.filter(slide => slide.id !== slideId)
+          if (remainingSlides.length > 0) {
+            setSelectedSlideId(remainingSlides[0].id)
+          }
+        }
+      } else {
+        throw new Error(data.error || 'Failed to delete slide')
+      }
+    } catch (err) {
+      console.error('Error deleting slide:', err)
+      throw err // Re-throw to be handled by SlidePanel
+    }
   }
 
   const handleTextBlockUpdate = async (slideId, updatedBlock) => {
@@ -515,6 +572,7 @@ export default function PresentationEditor() {
           selectedSlideId={selectedSlideId}
           onSlideSelect={handleSlideSelect}
           onAddSlide={handleAddSlide}
+          onDeleteSlide={handleDeleteSlide}
           userRole={userRole}
           isCreator={isCreator}
         />
