@@ -24,7 +24,7 @@ export default function SlidePanel({
     }
   }
 
-  const handleDeleteSlide = async (slideId, e) => {
+  const handleDeleteSlide = async (e, slideId) => {
     e.stopPropagation() // Prevent slide selection when delete button is clicked
     
     if (slides.length <= 1) {
@@ -58,7 +58,7 @@ export default function SlidePanel({
             key={slide.id}
             onClick={() => onSlideSelect(slide.id)}
             className={`
-              mb-2 p-3 rounded-lg cursor-pointer transition-all duration-200
+              mb-2 p-3 rounded-lg cursor-pointer transition-all duration-200 group
               ${selectedSlideId === slide.id 
                 ? 'bg-blue-100 border-2 border-blue-500 shadow-md' 
                 : 'bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm'
@@ -99,12 +99,15 @@ export default function SlidePanel({
                 {index + 1}
               </div>
               {/* Delete button */}
-              {(isCreator || userRole === 'Editor') && (
+              {(userRole === 'Creator' || userRole === 'Editor') && (
                 <button
-                  onClick={(e) => handleDeleteSlide(slide.id, e)}
-                  className="absolute top-1 right-1 bg-red-600 text-white text-xs px-1 rounded hover:bg-red-700"
+                  onClick={(e) => handleDeleteSlide(e, slide.id)}
+                  className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                  title="Delete slide"
                 >
-                  Delete
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                  </svg>
                 </button>
               )}
             </div>
