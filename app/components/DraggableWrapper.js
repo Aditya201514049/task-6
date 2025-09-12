@@ -24,7 +24,9 @@ export default function DraggableWrapper({
   const handleMouseDown = (e) => {
     if (disabled) return
     
-    // Don't prevent default immediately - let clicks through
+    // Stop event from bubbling to parent (canvas)
+    e.stopPropagation()
+    
     const rect = elementRef.current.getBoundingClientRect()
     setMouseStart({ x: e.clientX, y: e.clientY })
     setDragStart({
@@ -40,8 +42,8 @@ export default function DraggableWrapper({
   const handleMouseMove = (e) => {
     const moveDistance = Math.abs(e.clientX - mouseStart.x) + Math.abs(e.clientY - mouseStart.y)
     
-    // Only start dragging if mouse has moved more than 5 pixels
-    if (moveDistance > 5 && !isDragging) {
+    // Only start dragging if mouse has moved more than 3 pixels (reduced threshold)
+    if (moveDistance > 3 && !isDragging) {
       setIsDragging(true)
       setHasMoved(true)
     }
@@ -86,10 +88,23 @@ export default function DraggableWrapper({
     setHasMoved(false)
   }
 
+  const handleClick = (e) => {
+    // Prevent click from bubbling to canvas if we haven't moved (pure click)
+    if (!hasMoved) {
+      e.stopPropagation()
+    }
+  }
+
+  const handleDoubleClick = (e) => {
+    // Always prevent double-click from bubbling
+    e.stopPropagation()
+  }
+
   // Touch events for mobile support
   const handleTouchStart = (e) => {
     if (disabled) return
     
+    e.stopPropagation()
     const touch = e.touches[0]
     const rect = elementRef.current.getBoundingClientRect()
     
@@ -143,6 +158,8 @@ export default function DraggableWrapper({
         touchAction: 'none'
       }}
       onMouseDown={handleMouseDown}
+      onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
