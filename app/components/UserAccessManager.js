@@ -228,48 +228,6 @@ export default function UserAccessManager({
                 </div>
               </div>
 
-              {/* Invite Links */}
-              <div className="mb-6">
-                <h3 className="text-lg font-medium text-gray-800 mb-3">Share & Invite</h3>
-                {copySuccess && (
-                  <div className="mb-3 p-2 bg-green-100 border border-green-300 text-green-700 rounded text-sm">
-                    {copySuccess}
-                  </div>
-                )}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <div>
-                      <div className="font-medium text-gray-800">Viewer Invite Link</div>
-                      <div className="text-sm text-gray-500">Recipients can view the presentation</div>
-                    </div>
-                    <button
-                      onClick={() => copyInviteLink('viewer')}
-                      className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 flex items-center gap-1"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                      Copy Link
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                    <div>
-                      <div className="font-medium text-gray-800">Editor Invite Link</div>
-                      <div className="text-sm text-gray-500">Recipients can edit the presentation</div>
-                    </div>
-                    <button
-                      onClick={() => copyInviteLink('editor')}
-                      className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 flex items-center gap-1"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                      Copy Link
-                    </button>
-                  </div>
-                </div>
-              </div>
-
               {/* Current Users */}
               <div className="mb-6">
                 <h3 className="text-lg font-medium text-gray-800 mb-3">Current Users</h3>

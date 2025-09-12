@@ -29,30 +29,43 @@ export default function useSocket(presentationId, nickname) {
 
     // Connection event handlers
     socket.on('connect', () => {
-      console.log('Socket connected:', socket.id)
+      console.log('WebSocket connected successfully')
       setIsConnected(true)
       setError(null)
       
-      // Join the presentation room
-      socket.emit('join-presentation', {
-        presentationId,
-        nickname,
-        socketId: socket.id
-      })
+      // Join presentation room
+      socket.emit('join-presentation', { presentationId, nickname })
     })
 
     socket.on('disconnect', (reason) => {
-      console.log('Socket disconnected:', reason)
+      console.log('WebSocket disconnected:', reason)
       setIsConnected(false)
       if (reason === 'io server disconnect') {
-        // Server disconnected, try to reconnect
+        // Server initiated disconnect, reconnect manually
         socket.connect()
       }
     })
 
     socket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error)
-      setError('Connection failed')
+      console.error('WebSocket connection error:', error)
+      setError(`Connection failed: ${error.message}`)
+      setIsConnected(false)
+    })
+
+    socket.on('reconnect', (attemptNumber) => {
+      console.log('WebSocket reconnected after', attemptNumber, 'attempts')
+      setIsConnected(true)
+      setError(null)
+    })
+
+    socket.on('reconnect_error', (error) => {
+      console.error('WebSocket reconnection failed:', error)
+      setError(`Reconnection failed: ${error.message}`)
+    })
+
+    socket.on('reconnect_failed', () => {
+      console.error('WebSocket reconnection failed after all attempts')
+      setError('Connection failed. Please refresh the page.')
       setIsConnected(false)
     })
 
