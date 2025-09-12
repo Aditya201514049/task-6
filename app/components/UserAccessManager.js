@@ -175,10 +175,10 @@ export default function UserAccessManager({
 
       {/* Modal */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b">
+            <div className="flex items-center justify-between p-6 border-b flex-shrink-0">
               <h2 className="text-xl font-semibold text-gray-800">Manage User Access</h2>
               <button
                 onClick={() => setIsOpen(false)}
@@ -190,7 +190,8 @@ export default function UserAccessManager({
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto">
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-6">
               {error && (
                 <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded">
                   {error}
@@ -334,7 +335,7 @@ export default function UserAccessManager({
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end p-6 border-t bg-gray-50">
+            <div className="flex justify-end p-6 border-t bg-gray-50 flex-shrink-0">
               <button
                 onClick={() => setIsOpen(false)}
                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
