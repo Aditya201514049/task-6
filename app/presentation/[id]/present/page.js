@@ -189,6 +189,8 @@ export default function PresentMode() {
       const data = await response.json()
       
       if (data.success) {
+        console.log('Present mode - loaded presentation:', data.presentation)
+        console.log('Present mode - number of slides:', data.presentation.slides?.length)
         setPresentation(data.presentation)
       } else {
         throw new Error(data.error || 'Failed to load presentation')
